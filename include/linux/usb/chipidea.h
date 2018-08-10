@@ -79,6 +79,12 @@ struct ci_hdrc_platform_data {
 	struct ci_hdrc_cable		id_extcon;
 	struct mux_control		*usb_switch;
 	u32			phy_clkgate_delay_us;
+
+	/* pins */
+	struct pinctrl *pctl;
+	struct pinctrl_state *pins_default;
+	struct pinctrl_state *pins_host;
+	struct pinctrl_state *pins_device;
 };
 
 /* Default offset of capability registers */
