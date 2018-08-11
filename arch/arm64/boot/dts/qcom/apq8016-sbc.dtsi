@@ -218,7 +218,7 @@
 		};
 
 		usb@78d9000 {
-			extcon = <&usb_id>;
+			extcon = <&usb_id>, <&usb_id>;
 			status = "okay";
 			adp-disable;
 			hnp-disable;
@@ -226,6 +226,10 @@
 			mux-controls = <&usb_switch>;
 			mux-control-names = "usb_switch";
 
+			dr_mode = "otg";
+			pinctrl-names = "default", "device";
+			pinctrl-0 = <&usb_sw_sel_pm &usb_hub_reset_pm>;
+			pinctrl-1 = <&usb_sw_sel_pm_device &usb_hub_reset_pm_device>;
 			ulpi {
 				phy {
 					v1p8-supply = <&pm8916_l7>;
