@@ -600,6 +600,12 @@ struct drm_connector_state {
 	 * and the connector bpc limitations obtained from edid.
 	 */
 	u8 max_bpc;
+
+	/**
+	 * @hdr_output_metadata:
+	 * DRM blob property for HDR output metadata
+	 */
+	struct drm_property_blob *hdr_output_metadata;
 };
 
 /**
@@ -1247,6 +1253,10 @@ struct drm_connector {
 	 * Can find the panel which connected to drm_connector.
 	 */
 	struct drm_panel *panel;
+
+	/* HDR metdata */
+	struct hdr_output_metadata hdr_output_metadata;
+	struct hdr_sink_metadata hdr_sink_metadata;
 };
 
 #define obj_to_connector(x) container_of(x, struct drm_connector, base)
