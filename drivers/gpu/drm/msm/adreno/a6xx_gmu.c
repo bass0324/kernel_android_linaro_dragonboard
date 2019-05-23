@@ -1251,6 +1251,9 @@ void a6xx_gmu_remove(struct a6xx_gpu *a6xx_gpu)
 	free_irq(gmu->gmu_irq, gmu);
 	free_irq(gmu->hfi_irq, gmu);
 
+	/* Drop reference taken in of_find_device_by_node */
+	put_device(gmu->dev);
+
 	gmu->initialized = false;
 }
 
@@ -1275,12 +1278,12 @@ int a6xx_gmu_probe(struct a6xx_gpu *a6xx_gpu, struct device_node *node)
 	/* Get the list of clocks */
 	ret = a6xx_gmu_clocks_probe(gmu);
 	if (ret)
-		return ret;
+		goto err_put_device;
 
 	/* Set up the IOMMU context bank */
 	ret = a6xx_gmu_memory_probe(gmu);
 	if (ret)
-		return ret;
+		goto err_put_device;
 
 	/* Allocate memory for for the HFI queues */
 	gmu->hfi = a6xx_gmu_memory_alloc(gmu, SZ_16K);
@@ -1332,6 +1335,11 @@ err_memory:
 
 		iommu_domain_free(gmu->domain);
 	}
+	ret = -ENODEV;
 
-	return -ENODEV;
+err_put_device:
+	/* Drop reference taken in of_find_device_by_node */
+	put_device(gmu->dev);
+
+	return ret;
 }
