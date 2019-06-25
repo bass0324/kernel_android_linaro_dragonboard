@@ -1190,6 +1190,29 @@ static const struct panel_desc innolux_n156bge_l21 = {
 	},
 };
 
+static const struct drm_display_mode innolux_n173hce_e31_mode = {
+        .clock = 148800,
+        .hdisplay = 1920,
+        .hsync_start = 1920 + 88,
+        .hsync_end = 1920 + 88 + 44,
+        .htotal = 1920 + 88 + 44 + 148,
+        .vdisplay = 1080,
+        .vsync_start = 1080 + 4,
+        .vsync_end = 1080 + 4 + 5,
+        .vtotal = 1080 + 4 + 5 + 36,
+        .vrefresh = 60,
+};
+
+static const struct panel_desc innolux_n173hce_e31 = {
+        .modes = &innolux_n173hce_e31_mode,
+        .num_modes = 1,
+        .bpc = 6,
+        .size = {
+                .width = 382,
+                .height = 215,
+        },
+};
+
 static const struct drm_display_mode innolux_zj070na_01p_mode = {
 	.clock = 51501,
 	.hdisplay = 1024,
@@ -2037,6 +2060,9 @@ static const struct of_device_id platform_of_match[] = {
 		.compatible = "innolux,n156bge-l21",
 		.data = &innolux_n156bge_l21,
 	}, {
+                .compatible = "innolux,n173hce-e31",
+                .data = &innolux_n173hce_e31,
+        }, {
 		.compatible = "innolux,zj070na-01p",
 		.data = &innolux_zj070na_01p,
 	}, {
