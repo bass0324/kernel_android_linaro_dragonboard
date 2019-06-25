@@ -1,25 +1,25 @@
 /*
- * Copyright (C) 2013, NVIDIA Corporation.  All rights reserved.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sub license,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice (including the
- * next paragraph) shall be included in all copies or substantial portions
- * of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- */
+* Copyright (C) 2013, NVIDIA Corporation.  All rights reserved.
+*
+* Permission is hereby granted, free of charge, to any person obtaining a
+* copy of this software and associated documentation files (the "Software"),
+* to deal in the Software without restriction, including without limitation
+* the rights to use, copy, modify, merge, publish, distribute, sub license,
+* and/or sell copies of the Software, and to permit persons to whom the
+* Software is furnished to do so, subject to the following conditions:
+*
+* The above copyright notice and this permission notice (including the
+* next paragraph) shall be included in all copies or substantial portions
+* of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
+* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+* DEALINGS IN THE SOFTWARE.
+*/
 
 #include <linux/backlight.h>
 #include <linux/gpio/consumer.h>
@@ -37,1465 +37,1465 @@
 #include <video/videomode.h>
 
 struct panel_desc {
-	const struct drm_display_mode *modes;
-	unsigned int num_modes;
-	const struct display_timing *timings;
-	unsigned int num_timings;
+const struct drm_display_mode *modes;
+unsigned int num_modes;
+const struct display_timing *timings;
+unsigned int num_timings;
 
-	unsigned int bpc;
+unsigned int bpc;
 
-	/**
-	 * @width: width (in millimeters) of the panel's active display area
-	 * @height: height (in millimeters) of the panel's active display area
-	 */
-	struct {
-		unsigned int width;
-		unsigned int height;
-	} size;
+/**
+ * @width: width (in millimeters) of the panel's active display area
+ * @height: height (in millimeters) of the panel's active display area
+ */
+struct {
+	unsigned int width;
+	unsigned int height;
+} size;
 
-	/**
-	 * @prepare: the time (in milliseconds) that it takes for the panel to
-	 *           become ready and start receiving video data
-	 * @hpd_absent_delay: Add this to the prepare delay if we know Hot
-	 *                    Plug Detect isn't used.
-	 * @enable: the time (in milliseconds) that it takes for the panel to
-	 *          display the first valid frame after starting to receive
-	 *          video data
-	 * @disable: the time (in milliseconds) that it takes for the panel to
-	 *           turn the display off (no content is visible)
-	 * @unprepare: the time (in milliseconds) that it takes for the panel
-	 *             to power itself down completely
-	 */
-	struct {
-		unsigned int prepare;
-		unsigned int hpd_absent_delay;
-		unsigned int enable;
-		unsigned int disable;
-		unsigned int unprepare;
-	} delay;
+/**
+ * @prepare: the time (in milliseconds) that it takes for the panel to
+ *           become ready and start receiving video data
+ * @hpd_absent_delay: Add this to the prepare delay if we know Hot
+ *                    Plug Detect isn't used.
+ * @enable: the time (in milliseconds) that it takes for the panel to
+ *          display the first valid frame after starting to receive
+ *          video data
+ * @disable: the time (in milliseconds) that it takes for the panel to
+ *           turn the display off (no content is visible)
+ * @unprepare: the time (in milliseconds) that it takes for the panel
+ *             to power itself down completely
+ */
+struct {
+	unsigned int prepare;
+	unsigned int hpd_absent_delay;
+	unsigned int enable;
+	unsigned int disable;
+	unsigned int unprepare;
+} delay;
 
-	u32 bus_format;
-	u32 bus_flags;
+u32 bus_format;
+u32 bus_flags;
 };
 
 struct panel_simple {
-	struct drm_panel base;
-	bool prepared;
-	bool enabled;
-	bool no_hpd;
+struct drm_panel base;
+bool prepared;
+bool enabled;
+bool no_hpd;
 
-	const struct panel_desc *desc;
+const struct panel_desc *desc;
 
-	struct backlight_device *backlight;
-	struct regulator *supply;
-	struct i2c_adapter *ddc;
+struct backlight_device *backlight;
+struct regulator *supply;
+struct i2c_adapter *ddc;
 
-	struct gpio_desc *enable_gpio;
+struct gpio_desc *enable_gpio;
 };
 
 static inline struct panel_simple *to_panel_simple(struct drm_panel *panel)
 {
-	return container_of(panel, struct panel_simple, base);
+return container_of(panel, struct panel_simple, base);
 }
 
 static int panel_simple_get_fixed_modes(struct panel_simple *panel)
 {
-	struct drm_connector *connector = panel->base.connector;
-	struct drm_device *drm = panel->base.drm;
-	struct drm_display_mode *mode;
-	unsigned int i, num = 0;
+struct drm_connector *connector = panel->base.connector;
+struct drm_device *drm = panel->base.drm;
+struct drm_display_mode *mode;
+unsigned int i, num = 0;
 
-	if (!panel->desc)
-		return 0;
+if (!panel->desc)
+	return 0;
 
-	for (i = 0; i < panel->desc->num_timings; i++) {
-		const struct display_timing *dt = &panel->desc->timings[i];
-		struct videomode vm;
+for (i = 0; i < panel->desc->num_timings; i++) {
+	const struct display_timing *dt = &panel->desc->timings[i];
+	struct videomode vm;
 
-		videomode_from_timing(dt, &vm);
-		mode = drm_mode_create(drm);
-		if (!mode) {
-			dev_err(drm->dev, "failed to add mode %ux%u\n",
-				dt->hactive.typ, dt->vactive.typ);
-			continue;
-		}
-
-		drm_display_mode_from_videomode(&vm, mode);
-
-		mode->type |= DRM_MODE_TYPE_DRIVER;
-
-		if (panel->desc->num_timings == 1)
-			mode->type |= DRM_MODE_TYPE_PREFERRED;
-
-		drm_mode_probed_add(connector, mode);
-		num++;
+	videomode_from_timing(dt, &vm);
+	mode = drm_mode_create(drm);
+	if (!mode) {
+		dev_err(drm->dev, "failed to add mode %ux%u\n",
+			dt->hactive.typ, dt->vactive.typ);
+		continue;
 	}
 
-	for (i = 0; i < panel->desc->num_modes; i++) {
-		const struct drm_display_mode *m = &panel->desc->modes[i];
+	drm_display_mode_from_videomode(&vm, mode);
 
-		mode = drm_mode_duplicate(drm, m);
-		if (!mode) {
-			dev_err(drm->dev, "failed to add mode %ux%u@%u\n",
-				m->hdisplay, m->vdisplay, m->vrefresh);
-			continue;
-		}
+	mode->type |= DRM_MODE_TYPE_DRIVER;
 
-		mode->type |= DRM_MODE_TYPE_DRIVER;
+	if (panel->desc->num_timings == 1)
+		mode->type |= DRM_MODE_TYPE_PREFERRED;
 
-		if (panel->desc->num_modes == 1)
-			mode->type |= DRM_MODE_TYPE_PREFERRED;
+	drm_mode_probed_add(connector, mode);
+	num++;
+}
 
-		drm_mode_set_name(mode);
+for (i = 0; i < panel->desc->num_modes; i++) {
+	const struct drm_display_mode *m = &panel->desc->modes[i];
 
-		drm_mode_probed_add(connector, mode);
-		num++;
+	mode = drm_mode_duplicate(drm, m);
+	if (!mode) {
+		dev_err(drm->dev, "failed to add mode %ux%u@%u\n",
+			m->hdisplay, m->vdisplay, m->vrefresh);
+		continue;
 	}
 
-	connector->display_info.bpc = panel->desc->bpc;
-	connector->display_info.width_mm = panel->desc->size.width;
-	connector->display_info.height_mm = panel->desc->size.height;
-	if (panel->desc->bus_format)
-		drm_display_info_set_bus_formats(&connector->display_info,
-						 &panel->desc->bus_format, 1);
-	connector->display_info.bus_flags = panel->desc->bus_flags;
+	mode->type |= DRM_MODE_TYPE_DRIVER;
 
-	return num;
+	if (panel->desc->num_modes == 1)
+		mode->type |= DRM_MODE_TYPE_PREFERRED;
+
+	drm_mode_set_name(mode);
+
+	drm_mode_probed_add(connector, mode);
+	num++;
+}
+
+connector->display_info.bpc = panel->desc->bpc;
+connector->display_info.width_mm = panel->desc->size.width;
+connector->display_info.height_mm = panel->desc->size.height;
+if (panel->desc->bus_format)
+	drm_display_info_set_bus_formats(&connector->display_info,
+					 &panel->desc->bus_format, 1);
+connector->display_info.bus_flags = panel->desc->bus_flags;
+
+return num;
 }
 
 static int panel_simple_disable(struct drm_panel *panel)
 {
-	struct panel_simple *p = to_panel_simple(panel);
+struct panel_simple *p = to_panel_simple(panel);
 
-	if (!p->enabled)
-		return 0;
-
-	if (p->backlight) {
-		p->backlight->props.power = FB_BLANK_POWERDOWN;
-		p->backlight->props.state |= BL_CORE_FBBLANK;
-		backlight_update_status(p->backlight);
-	}
-
-	if (p->desc->delay.disable)
-		msleep(p->desc->delay.disable);
-
-	p->enabled = false;
-
+if (!p->enabled)
 	return 0;
+
+if (p->backlight) {
+	p->backlight->props.power = FB_BLANK_POWERDOWN;
+	p->backlight->props.state |= BL_CORE_FBBLANK;
+	backlight_update_status(p->backlight);
+}
+
+if (p->desc->delay.disable)
+	msleep(p->desc->delay.disable);
+
+p->enabled = false;
+
+return 0;
 }
 
 static int panel_simple_unprepare(struct drm_panel *panel)
 {
-	struct panel_simple *p = to_panel_simple(panel);
+struct panel_simple *p = to_panel_simple(panel);
 
-	if (!p->prepared)
-		return 0;
-
-	gpiod_set_value_cansleep(p->enable_gpio, 0);
-
-	regulator_disable(p->supply);
-
-	if (p->desc->delay.unprepare)
-		msleep(p->desc->delay.unprepare);
-
-	p->prepared = false;
-
+if (!p->prepared)
 	return 0;
+
+gpiod_set_value_cansleep(p->enable_gpio, 0);
+
+regulator_disable(p->supply);
+
+if (p->desc->delay.unprepare)
+	msleep(p->desc->delay.unprepare);
+
+p->prepared = false;
+
+return 0;
 }
 
 static int panel_simple_prepare(struct drm_panel *panel)
 {
-	struct panel_simple *p = to_panel_simple(panel);
-	unsigned int delay;
-	int err;
+struct panel_simple *p = to_panel_simple(panel);
+unsigned int delay;
+int err;
 
-	if (p->prepared)
-		return 0;
-
-	err = regulator_enable(p->supply);
-	if (err < 0) {
-		dev_err(panel->dev, "failed to enable supply: %d\n", err);
-		return err;
-	}
-
-	gpiod_set_value_cansleep(p->enable_gpio, 1);
-
-	delay = p->desc->delay.prepare;
-	if (p->no_hpd)
-		delay += p->desc->delay.hpd_absent_delay;
-	if (delay)
-		msleep(delay);
-
-	p->prepared = true;
-
+if (p->prepared)
 	return 0;
+
+err = regulator_enable(p->supply);
+if (err < 0) {
+	dev_err(panel->dev, "failed to enable supply: %d\n", err);
+	return err;
+}
+
+gpiod_set_value_cansleep(p->enable_gpio, 1);
+
+delay = p->desc->delay.prepare;
+if (p->no_hpd)
+	delay += p->desc->delay.hpd_absent_delay;
+if (delay)
+	msleep(delay);
+
+p->prepared = true;
+
+return 0;
 }
 
 static int panel_simple_enable(struct drm_panel *panel)
 {
-	struct panel_simple *p = to_panel_simple(panel);
+struct panel_simple *p = to_panel_simple(panel);
 
-	if (p->enabled)
-		return 0;
-
-	if (p->desc->delay.enable)
-		msleep(p->desc->delay.enable);
-
-	if (p->backlight) {
-		p->backlight->props.state &= ~BL_CORE_FBBLANK;
-		p->backlight->props.power = FB_BLANK_UNBLANK;
-		backlight_update_status(p->backlight);
-	}
-
-	p->enabled = true;
-
+if (p->enabled)
 	return 0;
+
+if (p->desc->delay.enable)
+	msleep(p->desc->delay.enable);
+
+if (p->backlight) {
+	p->backlight->props.state &= ~BL_CORE_FBBLANK;
+	p->backlight->props.power = FB_BLANK_UNBLANK;
+	backlight_update_status(p->backlight);
+}
+
+p->enabled = true;
+
+return 0;
 }
 
 static int panel_simple_get_modes(struct drm_panel *panel)
 {
-	struct panel_simple *p = to_panel_simple(panel);
-	int num = 0;
+struct panel_simple *p = to_panel_simple(panel);
+int num = 0;
 
-	/* probe EDID if a DDC bus is available */
-	if (p->ddc) {
-		struct edid *edid = drm_get_edid(panel->connector, p->ddc);
-		drm_connector_update_edid_property(panel->connector, edid);
-		if (edid) {
-			num += drm_add_edid_modes(panel->connector, edid);
-			kfree(edid);
-		}
+/* probe EDID if a DDC bus is available */
+if (p->ddc) {
+	struct edid *edid = drm_get_edid(panel->connector, p->ddc);
+	drm_connector_update_edid_property(panel->connector, edid);
+	if (edid) {
+		num += drm_add_edid_modes(panel->connector, edid);
+		kfree(edid);
 	}
+}
 
-	/* add hard-coded panel modes */
-	num += panel_simple_get_fixed_modes(p);
+/* add hard-coded panel modes */
+num += panel_simple_get_fixed_modes(p);
 
-	return num;
+return num;
 }
 
 static int panel_simple_get_timings(struct drm_panel *panel,
-				    unsigned int num_timings,
-				    struct display_timing *timings)
+			    unsigned int num_timings,
+			    struct display_timing *timings)
 {
-	struct panel_simple *p = to_panel_simple(panel);
-	unsigned int i;
+struct panel_simple *p = to_panel_simple(panel);
+unsigned int i;
 
-	if (p->desc->num_timings < num_timings)
-		num_timings = p->desc->num_timings;
+if (p->desc->num_timings < num_timings)
+	num_timings = p->desc->num_timings;
 
-	if (timings)
-		for (i = 0; i < num_timings; i++)
-			timings[i] = p->desc->timings[i];
+if (timings)
+	for (i = 0; i < num_timings; i++)
+		timings[i] = p->desc->timings[i];
 
-	return p->desc->num_timings;
+return p->desc->num_timings;
 }
 
 static const struct drm_panel_funcs panel_simple_funcs = {
-	.disable = panel_simple_disable,
-	.unprepare = panel_simple_unprepare,
-	.prepare = panel_simple_prepare,
-	.enable = panel_simple_enable,
-	.get_modes = panel_simple_get_modes,
-	.get_timings = panel_simple_get_timings,
+.disable = panel_simple_disable,
+.unprepare = panel_simple_unprepare,
+.prepare = panel_simple_prepare,
+.enable = panel_simple_enable,
+.get_modes = panel_simple_get_modes,
+.get_timings = panel_simple_get_timings,
 };
 
 static int panel_simple_probe(struct device *dev, const struct panel_desc *desc)
 {
-	struct device_node *backlight, *ddc;
-	struct panel_simple *panel;
-	int err;
+struct device_node *backlight, *ddc;
+struct panel_simple *panel;
+int err;
 
-	panel = devm_kzalloc(dev, sizeof(*panel), GFP_KERNEL);
-	if (!panel)
-		return -ENOMEM;
+panel = devm_kzalloc(dev, sizeof(*panel), GFP_KERNEL);
+if (!panel)
+	return -ENOMEM;
 
-	panel->enabled = false;
-	panel->prepared = false;
-	panel->desc = desc;
+panel->enabled = false;
+panel->prepared = false;
+panel->desc = desc;
 
-	panel->no_hpd = of_property_read_bool(dev->of_node, "no-hpd");
+panel->no_hpd = of_property_read_bool(dev->of_node, "no-hpd");
 
-	panel->supply = devm_regulator_get(dev, "power");
-	if (IS_ERR(panel->supply))
-		return PTR_ERR(panel->supply);
+panel->supply = devm_regulator_get(dev, "power");
+if (IS_ERR(panel->supply))
+	return PTR_ERR(panel->supply);
 
-	panel->enable_gpio = devm_gpiod_get_optional(dev, "enable",
-						     GPIOD_OUT_LOW);
-	if (IS_ERR(panel->enable_gpio)) {
-		err = PTR_ERR(panel->enable_gpio);
-		if (err != -EPROBE_DEFER)
-			dev_err(dev, "failed to request GPIO: %d\n", err);
-		return err;
+panel->enable_gpio = devm_gpiod_get_optional(dev, "enable",
+					     GPIOD_OUT_LOW);
+if (IS_ERR(panel->enable_gpio)) {
+	err = PTR_ERR(panel->enable_gpio);
+	if (err != -EPROBE_DEFER)
+		dev_err(dev, "failed to request GPIO: %d\n", err);
+	return err;
+}
+
+backlight = of_parse_phandle(dev->of_node, "backlight", 0);
+if (backlight) {
+	panel->backlight = of_find_backlight_by_node(backlight);
+	of_node_put(backlight);
+
+	if (!panel->backlight)
+		return -EPROBE_DEFER;
+}
+
+ddc = of_parse_phandle(dev->of_node, "ddc-i2c-bus", 0);
+if (ddc) {
+	panel->ddc = of_find_i2c_adapter_by_node(ddc);
+	of_node_put(ddc);
+
+	if (!panel->ddc) {
+		err = -EPROBE_DEFER;
+		goto free_backlight;
 	}
+}
 
-	backlight = of_parse_phandle(dev->of_node, "backlight", 0);
-	if (backlight) {
-		panel->backlight = of_find_backlight_by_node(backlight);
-		of_node_put(backlight);
+drm_panel_init(&panel->base);
+panel->base.dev = dev;
+panel->base.funcs = &panel_simple_funcs;
 
-		if (!panel->backlight)
-			return -EPROBE_DEFER;
-	}
+err = drm_panel_add(&panel->base);
+if (err < 0)
+	goto free_ddc;
 
-	ddc = of_parse_phandle(dev->of_node, "ddc-i2c-bus", 0);
-	if (ddc) {
-		panel->ddc = of_find_i2c_adapter_by_node(ddc);
-		of_node_put(ddc);
+dev_set_drvdata(dev, panel);
 
-		if (!panel->ddc) {
-			err = -EPROBE_DEFER;
-			goto free_backlight;
-		}
-	}
-
-	drm_panel_init(&panel->base);
-	panel->base.dev = dev;
-	panel->base.funcs = &panel_simple_funcs;
-
-	err = drm_panel_add(&panel->base);
-	if (err < 0)
-		goto free_ddc;
-
-	dev_set_drvdata(dev, panel);
-
-	return 0;
+return 0;
 
 free_ddc:
-	if (panel->ddc)
-		put_device(&panel->ddc->dev);
+if (panel->ddc)
+	put_device(&panel->ddc->dev);
 free_backlight:
-	if (panel->backlight)
-		put_device(&panel->backlight->dev);
+if (panel->backlight)
+	put_device(&panel->backlight->dev);
 
-	return err;
+return err;
 }
 
 static int panel_simple_remove(struct device *dev)
 {
-	struct panel_simple *panel = dev_get_drvdata(dev);
+struct panel_simple *panel = dev_get_drvdata(dev);
 
-	drm_panel_remove(&panel->base);
+drm_panel_remove(&panel->base);
 
-	panel_simple_disable(&panel->base);
-	panel_simple_unprepare(&panel->base);
+panel_simple_disable(&panel->base);
+panel_simple_unprepare(&panel->base);
 
-	if (panel->ddc)
-		put_device(&panel->ddc->dev);
+if (panel->ddc)
+	put_device(&panel->ddc->dev);
 
-	if (panel->backlight)
-		put_device(&panel->backlight->dev);
+if (panel->backlight)
+	put_device(&panel->backlight->dev);
 
-	return 0;
+return 0;
 }
 
 static void panel_simple_shutdown(struct device *dev)
 {
-	struct panel_simple *panel = dev_get_drvdata(dev);
+struct panel_simple *panel = dev_get_drvdata(dev);
 
-	panel_simple_disable(&panel->base);
-	panel_simple_unprepare(&panel->base);
+panel_simple_disable(&panel->base);
+panel_simple_unprepare(&panel->base);
 }
 
 static const struct drm_display_mode ampire_am_480272h3tmqw_t01h_mode = {
-	.clock = 9000,
-	.hdisplay = 480,
-	.hsync_start = 480 + 2,
-	.hsync_end = 480 + 2 + 41,
-	.htotal = 480 + 2 + 41 + 2,
-	.vdisplay = 272,
-	.vsync_start = 272 + 2,
-	.vsync_end = 272 + 2 + 10,
-	.vtotal = 272 + 2 + 10 + 2,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC,
+.clock = 9000,
+.hdisplay = 480,
+.hsync_start = 480 + 2,
+.hsync_end = 480 + 2 + 41,
+.htotal = 480 + 2 + 41 + 2,
+.vdisplay = 272,
+.vsync_start = 272 + 2,
+.vsync_end = 272 + 2 + 10,
+.vtotal = 272 + 2 + 10 + 2,
+.vrefresh = 60,
+.flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC,
 };
 
 static const struct panel_desc ampire_am_480272h3tmqw_t01h = {
-	.modes = &ampire_am_480272h3tmqw_t01h_mode,
-	.num_modes = 1,
-	.bpc = 8,
-	.size = {
-		.width = 105,
-		.height = 67,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+.modes = &ampire_am_480272h3tmqw_t01h_mode,
+.num_modes = 1,
+.bpc = 8,
+.size = {
+	.width = 105,
+	.height = 67,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
 };
 
 static const struct drm_display_mode ampire_am800480r3tmqwa1h_mode = {
-	.clock = 33333,
-	.hdisplay = 800,
-	.hsync_start = 800 + 0,
-	.hsync_end = 800 + 0 + 255,
-	.htotal = 800 + 0 + 255 + 0,
-	.vdisplay = 480,
-	.vsync_start = 480 + 2,
-	.vsync_end = 480 + 2 + 45,
-	.vtotal = 480 + 2 + 45 + 0,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC,
+.clock = 33333,
+.hdisplay = 800,
+.hsync_start = 800 + 0,
+.hsync_end = 800 + 0 + 255,
+.htotal = 800 + 0 + 255 + 0,
+.vdisplay = 480,
+.vsync_start = 480 + 2,
+.vsync_end = 480 + 2 + 45,
+.vtotal = 480 + 2 + 45 + 0,
+.vrefresh = 60,
+.flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC,
 };
 
 static const struct panel_desc ampire_am800480r3tmqwa1h = {
-	.modes = &ampire_am800480r3tmqwa1h_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 152,
-		.height = 91,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+.modes = &ampire_am800480r3tmqwa1h_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 152,
+	.height = 91,
+},
+.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
 };
 
 static const struct drm_display_mode auo_b101aw03_mode = {
-	.clock = 51450,
-	.hdisplay = 1024,
-	.hsync_start = 1024 + 156,
-	.hsync_end = 1024 + 156 + 8,
-	.htotal = 1024 + 156 + 8 + 156,
-	.vdisplay = 600,
-	.vsync_start = 600 + 16,
-	.vsync_end = 600 + 16 + 6,
-	.vtotal = 600 + 16 + 6 + 16,
-	.vrefresh = 60,
+.clock = 51450,
+.hdisplay = 1024,
+.hsync_start = 1024 + 156,
+.hsync_end = 1024 + 156 + 8,
+.htotal = 1024 + 156 + 8 + 156,
+.vdisplay = 600,
+.vsync_start = 600 + 16,
+.vsync_end = 600 + 16 + 6,
+.vtotal = 600 + 16 + 6 + 16,
+.vrefresh = 60,
 };
 
 static const struct panel_desc auo_b101aw03 = {
-	.modes = &auo_b101aw03_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 223,
-		.height = 125,
-	},
+.modes = &auo_b101aw03_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 223,
+	.height = 125,
+},
 };
 
 static const struct drm_display_mode auo_b101ean01_mode = {
-	.clock = 72500,
-	.hdisplay = 1280,
-	.hsync_start = 1280 + 119,
-	.hsync_end = 1280 + 119 + 32,
-	.htotal = 1280 + 119 + 32 + 21,
-	.vdisplay = 800,
-	.vsync_start = 800 + 4,
-	.vsync_end = 800 + 4 + 20,
-	.vtotal = 800 + 4 + 20 + 8,
-	.vrefresh = 60,
+.clock = 72500,
+.hdisplay = 1280,
+.hsync_start = 1280 + 119,
+.hsync_end = 1280 + 119 + 32,
+.htotal = 1280 + 119 + 32 + 21,
+.vdisplay = 800,
+.vsync_start = 800 + 4,
+.vsync_end = 800 + 4 + 20,
+.vtotal = 800 + 4 + 20 + 8,
+.vrefresh = 60,
 };
 
 static const struct panel_desc auo_b101ean01 = {
-	.modes = &auo_b101ean01_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 217,
-		.height = 136,
-	},
+.modes = &auo_b101ean01_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 217,
+	.height = 136,
+},
 };
 
 static const struct drm_display_mode auo_b101xtn01_mode = {
-	.clock = 72000,
-	.hdisplay = 1366,
-	.hsync_start = 1366 + 20,
-	.hsync_end = 1366 + 20 + 70,
-	.htotal = 1366 + 20 + 70,
-	.vdisplay = 768,
-	.vsync_start = 768 + 14,
-	.vsync_end = 768 + 14 + 42,
-	.vtotal = 768 + 14 + 42,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
+.clock = 72000,
+.hdisplay = 1366,
+.hsync_start = 1366 + 20,
+.hsync_end = 1366 + 20 + 70,
+.htotal = 1366 + 20 + 70,
+.vdisplay = 768,
+.vsync_start = 768 + 14,
+.vsync_end = 768 + 14 + 42,
+.vtotal = 768 + 14 + 42,
+.vrefresh = 60,
+.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
 };
 
 static const struct panel_desc auo_b101xtn01 = {
-	.modes = &auo_b101xtn01_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 223,
-		.height = 125,
-	},
+.modes = &auo_b101xtn01_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 223,
+	.height = 125,
+},
 };
 
 static const struct drm_display_mode auo_b116xw03_mode = {
-	.clock = 70589,
-	.hdisplay = 1366,
-	.hsync_start = 1366 + 40,
-	.hsync_end = 1366 + 40 + 40,
-	.htotal = 1366 + 40 + 40 + 32,
-	.vdisplay = 768,
-	.vsync_start = 768 + 10,
-	.vsync_end = 768 + 10 + 12,
-	.vtotal = 768 + 10 + 12 + 6,
-	.vrefresh = 60,
+.clock = 70589,
+.hdisplay = 1366,
+.hsync_start = 1366 + 40,
+.hsync_end = 1366 + 40 + 40,
+.htotal = 1366 + 40 + 40 + 32,
+.vdisplay = 768,
+.vsync_start = 768 + 10,
+.vsync_end = 768 + 10 + 12,
+.vtotal = 768 + 10 + 12 + 6,
+.vrefresh = 60,
 };
 
 static const struct panel_desc auo_b116xw03 = {
-	.modes = &auo_b116xw03_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 256,
-		.height = 144,
-	},
+.modes = &auo_b116xw03_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 256,
+	.height = 144,
+},
 };
 
 static const struct drm_display_mode auo_b133xtn01_mode = {
-	.clock = 69500,
-	.hdisplay = 1366,
-	.hsync_start = 1366 + 48,
-	.hsync_end = 1366 + 48 + 32,
-	.htotal = 1366 + 48 + 32 + 20,
-	.vdisplay = 768,
-	.vsync_start = 768 + 3,
-	.vsync_end = 768 + 3 + 6,
-	.vtotal = 768 + 3 + 6 + 13,
-	.vrefresh = 60,
+.clock = 69500,
+.hdisplay = 1366,
+.hsync_start = 1366 + 48,
+.hsync_end = 1366 + 48 + 32,
+.htotal = 1366 + 48 + 32 + 20,
+.vdisplay = 768,
+.vsync_start = 768 + 3,
+.vsync_end = 768 + 3 + 6,
+.vtotal = 768 + 3 + 6 + 13,
+.vrefresh = 60,
 };
 
 static const struct panel_desc auo_b133xtn01 = {
-	.modes = &auo_b133xtn01_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 293,
-		.height = 165,
-	},
+.modes = &auo_b133xtn01_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 293,
+	.height = 165,
+},
 };
 
 static const struct drm_display_mode auo_b133htn01_mode = {
-	.clock = 150660,
-	.hdisplay = 1920,
-	.hsync_start = 1920 + 172,
-	.hsync_end = 1920 + 172 + 80,
-	.htotal = 1920 + 172 + 80 + 60,
-	.vdisplay = 1080,
-	.vsync_start = 1080 + 25,
-	.vsync_end = 1080 + 25 + 10,
-	.vtotal = 1080 + 25 + 10 + 10,
-	.vrefresh = 60,
+.clock = 150660,
+.hdisplay = 1920,
+.hsync_start = 1920 + 172,
+.hsync_end = 1920 + 172 + 80,
+.htotal = 1920 + 172 + 80 + 60,
+.vdisplay = 1080,
+.vsync_start = 1080 + 25,
+.vsync_end = 1080 + 25 + 10,
+.vtotal = 1080 + 25 + 10 + 10,
+.vrefresh = 60,
 };
 
 static const struct panel_desc auo_b133htn01 = {
-	.modes = &auo_b133htn01_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 293,
-		.height = 165,
-	},
-	.delay = {
-		.prepare = 105,
-		.enable = 20,
-		.unprepare = 50,
-	},
+.modes = &auo_b133htn01_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 293,
+	.height = 165,
+},
+.delay = {
+	.prepare = 105,
+	.enable = 20,
+	.unprepare = 50,
+},
 };
 
 static const struct display_timing auo_g070vvn01_timings = {
-	.pixelclock = { 33300000, 34209000, 45000000 },
-	.hactive = { 800, 800, 800 },
-	.hfront_porch = { 20, 40, 200 },
-	.hback_porch = { 87, 40, 1 },
-	.hsync_len = { 1, 48, 87 },
-	.vactive = { 480, 480, 480 },
-	.vfront_porch = { 5, 13, 200 },
-	.vback_porch = { 31, 31, 29 },
-	.vsync_len = { 1, 1, 3 },
+.pixelclock = { 33300000, 34209000, 45000000 },
+.hactive = { 800, 800, 800 },
+.hfront_porch = { 20, 40, 200 },
+.hback_porch = { 87, 40, 1 },
+.hsync_len = { 1, 48, 87 },
+.vactive = { 480, 480, 480 },
+.vfront_porch = { 5, 13, 200 },
+.vback_porch = { 31, 31, 29 },
+.vsync_len = { 1, 1, 3 },
 };
 
 static const struct panel_desc auo_g070vvn01 = {
-	.timings = &auo_g070vvn01_timings,
-	.num_timings = 1,
-	.bpc = 8,
-	.size = {
-		.width = 152,
-		.height = 91,
-	},
-	.delay = {
-		.prepare = 200,
-		.enable = 50,
-		.disable = 50,
-		.unprepare = 1000,
-	},
+.timings = &auo_g070vvn01_timings,
+.num_timings = 1,
+.bpc = 8,
+.size = {
+	.width = 152,
+	.height = 91,
+},
+.delay = {
+	.prepare = 200,
+	.enable = 50,
+	.disable = 50,
+	.unprepare = 1000,
+},
 };
 
 static const struct drm_display_mode auo_g101evn010_mode = {
-	.clock = 68930,
-	.hdisplay = 1280,
-	.hsync_start = 1280 + 82,
-	.hsync_end = 1280 + 82 + 2,
-	.htotal = 1280 + 82 + 2 + 84,
-	.vdisplay = 800,
-	.vsync_start = 800 + 8,
-	.vsync_end = 800 + 8 + 2,
-	.vtotal = 800 + 8 + 2 + 6,
-	.vrefresh = 60,
+.clock = 68930,
+.hdisplay = 1280,
+.hsync_start = 1280 + 82,
+.hsync_end = 1280 + 82 + 2,
+.htotal = 1280 + 82 + 2 + 84,
+.vdisplay = 800,
+.vsync_start = 800 + 8,
+.vsync_end = 800 + 8 + 2,
+.vtotal = 800 + 8 + 2 + 6,
+.vrefresh = 60,
 };
 
 static const struct panel_desc auo_g101evn010 = {
-	.modes = &auo_g101evn010_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 216,
-		.height = 135,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+.modes = &auo_g101evn010_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 216,
+	.height = 135,
+},
+.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
 };
 
 static const struct drm_display_mode auo_g104sn02_mode = {
-	.clock = 40000,
-	.hdisplay = 800,
-	.hsync_start = 800 + 40,
-	.hsync_end = 800 + 40 + 216,
-	.htotal = 800 + 40 + 216 + 128,
-	.vdisplay = 600,
-	.vsync_start = 600 + 10,
-	.vsync_end = 600 + 10 + 35,
-	.vtotal = 600 + 10 + 35 + 2,
-	.vrefresh = 60,
+.clock = 40000,
+.hdisplay = 800,
+.hsync_start = 800 + 40,
+.hsync_end = 800 + 40 + 216,
+.htotal = 800 + 40 + 216 + 128,
+.vdisplay = 600,
+.vsync_start = 600 + 10,
+.vsync_end = 600 + 10 + 35,
+.vtotal = 600 + 10 + 35 + 2,
+.vrefresh = 60,
 };
 
 static const struct panel_desc auo_g104sn02 = {
-	.modes = &auo_g104sn02_mode,
-	.num_modes = 1,
-	.bpc = 8,
-	.size = {
-		.width = 211,
-		.height = 158,
-	},
+.modes = &auo_g104sn02_mode,
+.num_modes = 1,
+.bpc = 8,
+.size = {
+	.width = 211,
+	.height = 158,
+},
 };
 
 static const struct display_timing auo_g133han01_timings = {
-	.pixelclock = { 134000000, 141200000, 149000000 },
-	.hactive = { 1920, 1920, 1920 },
-	.hfront_porch = { 39, 58, 77 },
-	.hback_porch = { 59, 88, 117 },
-	.hsync_len = { 28, 42, 56 },
-	.vactive = { 1080, 1080, 1080 },
-	.vfront_porch = { 3, 8, 11 },
-	.vback_porch = { 5, 14, 19 },
-	.vsync_len = { 4, 14, 19 },
+.pixelclock = { 134000000, 141200000, 149000000 },
+.hactive = { 1920, 1920, 1920 },
+.hfront_porch = { 39, 58, 77 },
+.hback_porch = { 59, 88, 117 },
+.hsync_len = { 28, 42, 56 },
+.vactive = { 1080, 1080, 1080 },
+.vfront_porch = { 3, 8, 11 },
+.vback_porch = { 5, 14, 19 },
+.vsync_len = { 4, 14, 19 },
 };
 
 static const struct panel_desc auo_g133han01 = {
-	.timings = &auo_g133han01_timings,
-	.num_timings = 1,
-	.bpc = 8,
-	.size = {
-		.width = 293,
-		.height = 165,
-	},
-	.delay = {
-		.prepare = 200,
-		.enable = 50,
-		.disable = 50,
-		.unprepare = 1000,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_JEIDA,
+.timings = &auo_g133han01_timings,
+.num_timings = 1,
+.bpc = 8,
+.size = {
+	.width = 293,
+	.height = 165,
+},
+.delay = {
+	.prepare = 200,
+	.enable = 50,
+	.disable = 50,
+	.unprepare = 1000,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_JEIDA,
 };
 
 static const struct display_timing auo_g185han01_timings = {
-	.pixelclock = { 120000000, 144000000, 175000000 },
-	.hactive = { 1920, 1920, 1920 },
-	.hfront_porch = { 18, 60, 74 },
-	.hback_porch = { 12, 44, 54 },
-	.hsync_len = { 10, 24, 32 },
-	.vactive = { 1080, 1080, 1080 },
-	.vfront_porch = { 6, 10, 40 },
-	.vback_porch = { 2, 5, 20 },
-	.vsync_len = { 2, 5, 20 },
+.pixelclock = { 120000000, 144000000, 175000000 },
+.hactive = { 1920, 1920, 1920 },
+.hfront_porch = { 18, 60, 74 },
+.hback_porch = { 12, 44, 54 },
+.hsync_len = { 10, 24, 32 },
+.vactive = { 1080, 1080, 1080 },
+.vfront_porch = { 6, 10, 40 },
+.vback_porch = { 2, 5, 20 },
+.vsync_len = { 2, 5, 20 },
 };
 
 static const struct panel_desc auo_g185han01 = {
-	.timings = &auo_g185han01_timings,
-	.num_timings = 1,
-	.bpc = 8,
-	.size = {
-		.width = 409,
-		.height = 230,
-	},
-	.delay = {
-		.prepare = 50,
-		.enable = 200,
-		.disable = 110,
-		.unprepare = 1000,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+.timings = &auo_g185han01_timings,
+.num_timings = 1,
+.bpc = 8,
+.size = {
+	.width = 409,
+	.height = 230,
+},
+.delay = {
+	.prepare = 50,
+	.enable = 200,
+	.disable = 110,
+	.unprepare = 1000,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
 };
 
 static const struct display_timing auo_p320hvn03_timings = {
-	.pixelclock = { 106000000, 148500000, 164000000 },
-	.hactive = { 1920, 1920, 1920 },
-	.hfront_porch = { 25, 50, 130 },
-	.hback_porch = { 25, 50, 130 },
-	.hsync_len = { 20, 40, 105 },
-	.vactive = { 1080, 1080, 1080 },
-	.vfront_porch = { 8, 17, 150 },
-	.vback_porch = { 8, 17, 150 },
-	.vsync_len = { 4, 11, 100 },
+.pixelclock = { 106000000, 148500000, 164000000 },
+.hactive = { 1920, 1920, 1920 },
+.hfront_porch = { 25, 50, 130 },
+.hback_porch = { 25, 50, 130 },
+.hsync_len = { 20, 40, 105 },
+.vactive = { 1080, 1080, 1080 },
+.vfront_porch = { 8, 17, 150 },
+.vback_porch = { 8, 17, 150 },
+.vsync_len = { 4, 11, 100 },
 };
 
 static const struct panel_desc auo_p320hvn03 = {
-	.timings = &auo_p320hvn03_timings,
-	.num_timings = 1,
-	.bpc = 8,
-	.size = {
-		.width = 698,
-		.height = 393,
-	},
-	.delay = {
-		.prepare = 1,
-		.enable = 450,
-		.unprepare = 500,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+.timings = &auo_p320hvn03_timings,
+.num_timings = 1,
+.bpc = 8,
+.size = {
+	.width = 698,
+	.height = 393,
+},
+.delay = {
+	.prepare = 1,
+	.enable = 450,
+	.unprepare = 500,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
 };
 
 static const struct drm_display_mode auo_t215hvn01_mode = {
-	.clock = 148800,
-	.hdisplay = 1920,
-	.hsync_start = 1920 + 88,
-	.hsync_end = 1920 + 88 + 44,
-	.htotal = 1920 + 88 + 44 + 148,
-	.vdisplay = 1080,
-	.vsync_start = 1080 + 4,
-	.vsync_end = 1080 + 4 + 5,
-	.vtotal = 1080 + 4 + 5 + 36,
-	.vrefresh = 60,
+.clock = 148800,
+.hdisplay = 1920,
+.hsync_start = 1920 + 88,
+.hsync_end = 1920 + 88 + 44,
+.htotal = 1920 + 88 + 44 + 148,
+.vdisplay = 1080,
+.vsync_start = 1080 + 4,
+.vsync_end = 1080 + 4 + 5,
+.vtotal = 1080 + 4 + 5 + 36,
+.vrefresh = 60,
 };
 
 static const struct panel_desc auo_t215hvn01 = {
-	.modes = &auo_t215hvn01_mode,
-	.num_modes = 1,
-	.bpc = 8,
-	.size = {
-		.width = 430,
-		.height = 270,
-	},
-	.delay = {
-		.disable = 5,
-		.unprepare = 1000,
-	}
+.modes = &auo_t215hvn01_mode,
+.num_modes = 1,
+.bpc = 8,
+.size = {
+	.width = 430,
+	.height = 270,
+},
+.delay = {
+	.disable = 5,
+	.unprepare = 1000,
+}
 };
 
 static const struct drm_display_mode avic_tm070ddh03_mode = {
-	.clock = 51200,
-	.hdisplay = 1024,
-	.hsync_start = 1024 + 160,
-	.hsync_end = 1024 + 160 + 4,
-	.htotal = 1024 + 160 + 4 + 156,
-	.vdisplay = 600,
-	.vsync_start = 600 + 17,
-	.vsync_end = 600 + 17 + 1,
-	.vtotal = 600 + 17 + 1 + 17,
-	.vrefresh = 60,
+.clock = 51200,
+.hdisplay = 1024,
+.hsync_start = 1024 + 160,
+.hsync_end = 1024 + 160 + 4,
+.htotal = 1024 + 160 + 4 + 156,
+.vdisplay = 600,
+.vsync_start = 600 + 17,
+.vsync_end = 600 + 17 + 1,
+.vtotal = 600 + 17 + 1 + 17,
+.vrefresh = 60,
 };
 
 static const struct panel_desc avic_tm070ddh03 = {
-	.modes = &avic_tm070ddh03_mode,
-	.num_modes = 1,
-	.bpc = 8,
-	.size = {
-		.width = 154,
-		.height = 90,
-	},
-	.delay = {
-		.prepare = 20,
-		.enable = 200,
-		.disable = 200,
-	},
+.modes = &avic_tm070ddh03_mode,
+.num_modes = 1,
+.bpc = 8,
+.size = {
+	.width = 154,
+	.height = 90,
+},
+.delay = {
+	.prepare = 20,
+	.enable = 200,
+	.disable = 200,
+},
 };
 
 static const struct drm_display_mode bananapi_s070wv20_ct16_mode = {
-	.clock = 30000,
-	.hdisplay = 800,
-	.hsync_start = 800 + 40,
-	.hsync_end = 800 + 40 + 48,
-	.htotal = 800 + 40 + 48 + 40,
-	.vdisplay = 480,
-	.vsync_start = 480 + 13,
-	.vsync_end = 480 + 13 + 3,
-	.vtotal = 480 + 13 + 3 + 29,
+.clock = 30000,
+.hdisplay = 800,
+.hsync_start = 800 + 40,
+.hsync_end = 800 + 40 + 48,
+.htotal = 800 + 40 + 48 + 40,
+.vdisplay = 480,
+.vsync_start = 480 + 13,
+.vsync_end = 480 + 13 + 3,
+.vtotal = 480 + 13 + 3 + 29,
 };
 
 static const struct panel_desc bananapi_s070wv20_ct16 = {
-	.modes = &bananapi_s070wv20_ct16_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 154,
-		.height = 86,
-	},
+.modes = &bananapi_s070wv20_ct16_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 154,
+	.height = 86,
+},
 };
 
 static const struct drm_display_mode boe_hv070wsa_mode = {
-	.clock = 42105,
-	.hdisplay = 1024,
-	.hsync_start = 1024 + 30,
-	.hsync_end = 1024 + 30 + 30,
-	.htotal = 1024 + 30 + 30 + 30,
-	.vdisplay = 600,
-	.vsync_start = 600 + 10,
-	.vsync_end = 600 + 10 + 10,
-	.vtotal = 600 + 10 + 10 + 10,
-	.vrefresh = 60,
+.clock = 42105,
+.hdisplay = 1024,
+.hsync_start = 1024 + 30,
+.hsync_end = 1024 + 30 + 30,
+.htotal = 1024 + 30 + 30 + 30,
+.vdisplay = 600,
+.vsync_start = 600 + 10,
+.vsync_end = 600 + 10 + 10,
+.vtotal = 600 + 10 + 10 + 10,
+.vrefresh = 60,
 };
 
 static const struct panel_desc boe_hv070wsa = {
-	.modes = &boe_hv070wsa_mode,
-	.num_modes = 1,
-	.size = {
-		.width = 154,
-		.height = 90,
-	},
+.modes = &boe_hv070wsa_mode,
+.num_modes = 1,
+.size = {
+	.width = 154,
+	.height = 90,
+},
 };
 
 static const struct drm_display_mode boe_nv101wxmn51_modes[] = {
-	{
-		.clock = 71900,
-		.hdisplay = 1280,
-		.hsync_start = 1280 + 48,
-		.hsync_end = 1280 + 48 + 32,
-		.htotal = 1280 + 48 + 32 + 80,
-		.vdisplay = 800,
-		.vsync_start = 800 + 3,
-		.vsync_end = 800 + 3 + 5,
-		.vtotal = 800 + 3 + 5 + 24,
-		.vrefresh = 60,
-	},
-	{
-		.clock = 57500,
-		.hdisplay = 1280,
-		.hsync_start = 1280 + 48,
-		.hsync_end = 1280 + 48 + 32,
-		.htotal = 1280 + 48 + 32 + 80,
-		.vdisplay = 800,
-		.vsync_start = 800 + 3,
-		.vsync_end = 800 + 3 + 5,
-		.vtotal = 800 + 3 + 5 + 24,
-		.vrefresh = 48,
-	},
+{
+	.clock = 71900,
+	.hdisplay = 1280,
+	.hsync_start = 1280 + 48,
+	.hsync_end = 1280 + 48 + 32,
+	.htotal = 1280 + 48 + 32 + 80,
+	.vdisplay = 800,
+	.vsync_start = 800 + 3,
+	.vsync_end = 800 + 3 + 5,
+	.vtotal = 800 + 3 + 5 + 24,
+	.vrefresh = 60,
+},
+{
+	.clock = 57500,
+	.hdisplay = 1280,
+	.hsync_start = 1280 + 48,
+	.hsync_end = 1280 + 48 + 32,
+	.htotal = 1280 + 48 + 32 + 80,
+	.vdisplay = 800,
+	.vsync_start = 800 + 3,
+	.vsync_end = 800 + 3 + 5,
+	.vtotal = 800 + 3 + 5 + 24,
+	.vrefresh = 48,
+},
 };
 
 static const struct panel_desc boe_nv101wxmn51 = {
-	.modes = boe_nv101wxmn51_modes,
-	.num_modes = ARRAY_SIZE(boe_nv101wxmn51_modes),
-	.bpc = 8,
-	.size = {
-		.width = 217,
-		.height = 136,
-	},
-	.delay = {
-		.prepare = 210,
-		.enable = 50,
-		.unprepare = 160,
-	},
+.modes = boe_nv101wxmn51_modes,
+.num_modes = ARRAY_SIZE(boe_nv101wxmn51_modes),
+.bpc = 8,
+.size = {
+	.width = 217,
+	.height = 136,
+},
+.delay = {
+	.prepare = 210,
+	.enable = 50,
+	.unprepare = 160,
+},
 };
 
 static const struct drm_display_mode cdtech_s043wq26h_ct7_mode = {
-	.clock = 9000,
-	.hdisplay = 480,
-	.hsync_start = 480 + 5,
-	.hsync_end = 480 + 5 + 5,
-	.htotal = 480 + 5 + 5 + 40,
-	.vdisplay = 272,
-	.vsync_start = 272 + 8,
-	.vsync_end = 272 + 8 + 8,
-	.vtotal = 272 + 8 + 8 + 8,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
+.clock = 9000,
+.hdisplay = 480,
+.hsync_start = 480 + 5,
+.hsync_end = 480 + 5 + 5,
+.htotal = 480 + 5 + 5 + 40,
+.vdisplay = 272,
+.vsync_start = 272 + 8,
+.vsync_end = 272 + 8 + 8,
+.vtotal = 272 + 8 + 8 + 8,
+.vrefresh = 60,
+.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
 };
 
 static const struct panel_desc cdtech_s043wq26h_ct7 = {
-	.modes = &cdtech_s043wq26h_ct7_mode,
-	.num_modes = 1,
-	.bpc = 8,
-	.size = {
-		.width = 95,
-		.height = 54,
-	},
-	.bus_flags = DRM_BUS_FLAG_PIXDATA_DRIVE_POSEDGE,
+.modes = &cdtech_s043wq26h_ct7_mode,
+.num_modes = 1,
+.bpc = 8,
+.size = {
+	.width = 95,
+	.height = 54,
+},
+.bus_flags = DRM_BUS_FLAG_PIXDATA_DRIVE_POSEDGE,
 };
 
 static const struct drm_display_mode cdtech_s070wv95_ct16_mode = {
-	.clock = 35000,
-	.hdisplay = 800,
-	.hsync_start = 800 + 40,
-	.hsync_end = 800 + 40 + 40,
-	.htotal = 800 + 40 + 40 + 48,
-	.vdisplay = 480,
-	.vsync_start = 480 + 29,
-	.vsync_end = 480 + 29 + 13,
-	.vtotal = 480 + 29 + 13 + 3,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
+.clock = 35000,
+.hdisplay = 800,
+.hsync_start = 800 + 40,
+.hsync_end = 800 + 40 + 40,
+.htotal = 800 + 40 + 40 + 48,
+.vdisplay = 480,
+.vsync_start = 480 + 29,
+.vsync_end = 480 + 29 + 13,
+.vtotal = 480 + 29 + 13 + 3,
+.vrefresh = 60,
+.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
 };
 
 static const struct panel_desc cdtech_s070wv95_ct16 = {
-	.modes = &cdtech_s070wv95_ct16_mode,
-	.num_modes = 1,
-	.bpc = 8,
-	.size = {
-		.width = 154,
-		.height = 85,
-	},
+.modes = &cdtech_s070wv95_ct16_mode,
+.num_modes = 1,
+.bpc = 8,
+.size = {
+	.width = 154,
+	.height = 85,
+},
 };
 
 static const struct drm_display_mode chunghwa_claa070wp03xg_mode = {
-	.clock = 66770,
-	.hdisplay = 800,
-	.hsync_start = 800 + 49,
-	.hsync_end = 800 + 49 + 33,
-	.htotal = 800 + 49 + 33 + 17,
-	.vdisplay = 1280,
-	.vsync_start = 1280 + 1,
-	.vsync_end = 1280 + 1 + 7,
-	.vtotal = 1280 + 1 + 7 + 15,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
+.clock = 66770,
+.hdisplay = 800,
+.hsync_start = 800 + 49,
+.hsync_end = 800 + 49 + 33,
+.htotal = 800 + 49 + 33 + 17,
+.vdisplay = 1280,
+.vsync_start = 1280 + 1,
+.vsync_end = 1280 + 1 + 7,
+.vtotal = 1280 + 1 + 7 + 15,
+.vrefresh = 60,
+.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
 };
 
 static const struct panel_desc chunghwa_claa070wp03xg = {
-	.modes = &chunghwa_claa070wp03xg_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 94,
-		.height = 150,
-	},
+.modes = &chunghwa_claa070wp03xg_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 94,
+	.height = 150,
+},
 };
 
 static const struct drm_display_mode chunghwa_claa101wa01a_mode = {
-	.clock = 72070,
-	.hdisplay = 1366,
-	.hsync_start = 1366 + 58,
-	.hsync_end = 1366 + 58 + 58,
-	.htotal = 1366 + 58 + 58 + 58,
-	.vdisplay = 768,
-	.vsync_start = 768 + 4,
-	.vsync_end = 768 + 4 + 4,
-	.vtotal = 768 + 4 + 4 + 4,
-	.vrefresh = 60,
+.clock = 72070,
+.hdisplay = 1366,
+.hsync_start = 1366 + 58,
+.hsync_end = 1366 + 58 + 58,
+.htotal = 1366 + 58 + 58 + 58,
+.vdisplay = 768,
+.vsync_start = 768 + 4,
+.vsync_end = 768 + 4 + 4,
+.vtotal = 768 + 4 + 4 + 4,
+.vrefresh = 60,
 };
 
 static const struct panel_desc chunghwa_claa101wa01a = {
-	.modes = &chunghwa_claa101wa01a_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 220,
-		.height = 120,
-	},
+.modes = &chunghwa_claa101wa01a_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 220,
+	.height = 120,
+},
 };
 
 static const struct drm_display_mode chunghwa_claa101wb01_mode = {
-	.clock = 69300,
-	.hdisplay = 1366,
-	.hsync_start = 1366 + 48,
-	.hsync_end = 1366 + 48 + 32,
-	.htotal = 1366 + 48 + 32 + 20,
-	.vdisplay = 768,
-	.vsync_start = 768 + 16,
-	.vsync_end = 768 + 16 + 8,
-	.vtotal = 768 + 16 + 8 + 16,
-	.vrefresh = 60,
+.clock = 69300,
+.hdisplay = 1366,
+.hsync_start = 1366 + 48,
+.hsync_end = 1366 + 48 + 32,
+.htotal = 1366 + 48 + 32 + 20,
+.vdisplay = 768,
+.vsync_start = 768 + 16,
+.vsync_end = 768 + 16 + 8,
+.vtotal = 768 + 16 + 8 + 16,
+.vrefresh = 60,
 };
 
 static const struct panel_desc chunghwa_claa101wb01 = {
-	.modes = &chunghwa_claa101wb01_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 223,
-		.height = 125,
-	},
+.modes = &chunghwa_claa101wb01_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 223,
+	.height = 125,
+},
 };
 
 static const struct drm_display_mode dataimage_scf0700c48ggu18_mode = {
-	.clock = 33260,
-	.hdisplay = 800,
-	.hsync_start = 800 + 40,
-	.hsync_end = 800 + 40 + 128,
-	.htotal = 800 + 40 + 128 + 88,
-	.vdisplay = 480,
-	.vsync_start = 480 + 10,
-	.vsync_end = 480 + 10 + 2,
-	.vtotal = 480 + 10 + 2 + 33,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
+.clock = 33260,
+.hdisplay = 800,
+.hsync_start = 800 + 40,
+.hsync_end = 800 + 40 + 128,
+.htotal = 800 + 40 + 128 + 88,
+.vdisplay = 480,
+.vsync_start = 480 + 10,
+.vsync_end = 480 + 10 + 2,
+.vtotal = 480 + 10 + 2 + 33,
+.vrefresh = 60,
+.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
 };
 
 static const struct panel_desc dataimage_scf0700c48ggu18 = {
-	.modes = &dataimage_scf0700c48ggu18_mode,
-	.num_modes = 1,
-	.bpc = 8,
-	.size = {
-		.width = 152,
-		.height = 91,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
-	.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_DRIVE_POSEDGE,
+.modes = &dataimage_scf0700c48ggu18_mode,
+.num_modes = 1,
+.bpc = 8,
+.size = {
+	.width = 152,
+	.height = 91,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_DRIVE_POSEDGE,
 };
 
 static const struct display_timing dlc_dlc0700yzg_1_timing = {
-	.pixelclock = { 45000000, 51200000, 57000000 },
-	.hactive = { 1024, 1024, 1024 },
-	.hfront_porch = { 100, 106, 113 },
-	.hback_porch = { 100, 106, 113 },
-	.hsync_len = { 100, 108, 114 },
-	.vactive = { 600, 600, 600 },
-	.vfront_porch = { 8, 11, 15 },
-	.vback_porch = { 8, 11, 15 },
-	.vsync_len = { 9, 13, 15 },
-	.flags = DISPLAY_FLAGS_DE_HIGH,
+.pixelclock = { 45000000, 51200000, 57000000 },
+.hactive = { 1024, 1024, 1024 },
+.hfront_porch = { 100, 106, 113 },
+.hback_porch = { 100, 106, 113 },
+.hsync_len = { 100, 108, 114 },
+.vactive = { 600, 600, 600 },
+.vfront_porch = { 8, 11, 15 },
+.vback_porch = { 8, 11, 15 },
+.vsync_len = { 9, 13, 15 },
+.flags = DISPLAY_FLAGS_DE_HIGH,
 };
 
 static const struct panel_desc dlc_dlc0700yzg_1 = {
-	.timings = &dlc_dlc0700yzg_1_timing,
-	.num_timings = 1,
-	.bpc = 6,
-	.size = {
-		.width = 154,
-		.height = 86,
-	},
-	.delay = {
-		.prepare = 30,
-		.enable = 200,
-		.disable = 200,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG,
+.timings = &dlc_dlc0700yzg_1_timing,
+.num_timings = 1,
+.bpc = 6,
+.size = {
+	.width = 154,
+	.height = 86,
+},
+.delay = {
+	.prepare = 30,
+	.enable = 200,
+	.disable = 200,
+},
+.bus_format = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG,
 };
 
 static const struct display_timing dlc_dlc1010gig_timing = {
-	.pixelclock = { 68900000, 71100000, 73400000 },
-	.hactive = { 1280, 1280, 1280 },
-	.hfront_porch = { 43, 53, 63 },
-	.hback_porch = { 43, 53, 63 },
-	.hsync_len = { 44, 54, 64 },
-	.vactive = { 800, 800, 800 },
-	.vfront_porch = { 5, 8, 11 },
-	.vback_porch = { 5, 8, 11 },
-	.vsync_len = { 5, 7, 11 },
-	.flags = DISPLAY_FLAGS_DE_HIGH,
+.pixelclock = { 68900000, 71100000, 73400000 },
+.hactive = { 1280, 1280, 1280 },
+.hfront_porch = { 43, 53, 63 },
+.hback_porch = { 43, 53, 63 },
+.hsync_len = { 44, 54, 64 },
+.vactive = { 800, 800, 800 },
+.vfront_porch = { 5, 8, 11 },
+.vback_porch = { 5, 8, 11 },
+.vsync_len = { 5, 7, 11 },
+.flags = DISPLAY_FLAGS_DE_HIGH,
 };
 
 static const struct panel_desc dlc_dlc1010gig = {
-	.timings = &dlc_dlc1010gig_timing,
-	.num_timings = 1,
-	.bpc = 8,
-	.size = {
-		.width = 216,
-		.height = 135,
-	},
-	.delay = {
-		.prepare = 60,
-		.enable = 150,
-		.disable = 100,
-		.unprepare = 60,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+.timings = &dlc_dlc1010gig_timing,
+.num_timings = 1,
+.bpc = 8,
+.size = {
+	.width = 216,
+	.height = 135,
+},
+.delay = {
+	.prepare = 60,
+	.enable = 150,
+	.disable = 100,
+	.unprepare = 60,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
 };
 
 static const struct drm_display_mode edt_et057090dhu_mode = {
-	.clock = 25175,
-	.hdisplay = 640,
-	.hsync_start = 640 + 16,
-	.hsync_end = 640 + 16 + 30,
-	.htotal = 640 + 16 + 30 + 114,
-	.vdisplay = 480,
-	.vsync_start = 480 + 10,
-	.vsync_end = 480 + 10 + 3,
-	.vtotal = 480 + 10 + 3 + 32,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
+.clock = 25175,
+.hdisplay = 640,
+.hsync_start = 640 + 16,
+.hsync_end = 640 + 16 + 30,
+.htotal = 640 + 16 + 30 + 114,
+.vdisplay = 480,
+.vsync_start = 480 + 10,
+.vsync_end = 480 + 10 + 3,
+.vtotal = 480 + 10 + 3 + 32,
+.vrefresh = 60,
+.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
 };
 
 static const struct panel_desc edt_et057090dhu = {
-	.modes = &edt_et057090dhu_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 115,
-		.height = 86,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
-	.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_DRIVE_NEGEDGE,
+.modes = &edt_et057090dhu_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 115,
+	.height = 86,
+},
+.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_DRIVE_NEGEDGE,
 };
 
 static const struct drm_display_mode edt_etm0700g0dh6_mode = {
-	.clock = 33260,
-	.hdisplay = 800,
-	.hsync_start = 800 + 40,
-	.hsync_end = 800 + 40 + 128,
-	.htotal = 800 + 40 + 128 + 88,
-	.vdisplay = 480,
-	.vsync_start = 480 + 10,
-	.vsync_end = 480 + 10 + 2,
-	.vtotal = 480 + 10 + 2 + 33,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
+.clock = 33260,
+.hdisplay = 800,
+.hsync_start = 800 + 40,
+.hsync_end = 800 + 40 + 128,
+.htotal = 800 + 40 + 128 + 88,
+.vdisplay = 480,
+.vsync_start = 480 + 10,
+.vsync_end = 480 + 10 + 2,
+.vtotal = 480 + 10 + 2 + 33,
+.vrefresh = 60,
+.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
 };
 
 static const struct panel_desc edt_etm0700g0dh6 = {
-	.modes = &edt_etm0700g0dh6_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 152,
-		.height = 91,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
-	.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_DRIVE_NEGEDGE,
+.modes = &edt_etm0700g0dh6_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 152,
+	.height = 91,
+},
+.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_DRIVE_NEGEDGE,
 };
 
 static const struct panel_desc edt_etm0700g0bdh6 = {
-	.modes = &edt_etm0700g0dh6_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 152,
-		.height = 91,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
-	.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_DRIVE_POSEDGE,
+.modes = &edt_etm0700g0dh6_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 152,
+	.height = 91,
+},
+.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_DRIVE_POSEDGE,
 };
 
 static const struct drm_display_mode foxlink_fl500wvr00_a0t_mode = {
-	.clock = 32260,
-	.hdisplay = 800,
-	.hsync_start = 800 + 168,
-	.hsync_end = 800 + 168 + 64,
-	.htotal = 800 + 168 + 64 + 88,
-	.vdisplay = 480,
-	.vsync_start = 480 + 37,
-	.vsync_end = 480 + 37 + 2,
-	.vtotal = 480 + 37 + 2 + 8,
-	.vrefresh = 60,
+.clock = 32260,
+.hdisplay = 800,
+.hsync_start = 800 + 168,
+.hsync_end = 800 + 168 + 64,
+.htotal = 800 + 168 + 64 + 88,
+.vdisplay = 480,
+.vsync_start = 480 + 37,
+.vsync_end = 480 + 37 + 2,
+.vtotal = 480 + 37 + 2 + 8,
+.vrefresh = 60,
 };
 
 static const struct panel_desc foxlink_fl500wvr00_a0t = {
-	.modes = &foxlink_fl500wvr00_a0t_mode,
-	.num_modes = 1,
-	.bpc = 8,
-	.size = {
-		.width = 108,
-		.height = 65,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+.modes = &foxlink_fl500wvr00_a0t_mode,
+.num_modes = 1,
+.bpc = 8,
+.size = {
+	.width = 108,
+	.height = 65,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
 };
 
 static const struct drm_display_mode giantplus_gpg482739qs5_mode = {
-	.clock = 9000,
-	.hdisplay = 480,
-	.hsync_start = 480 + 5,
-	.hsync_end = 480 + 5 + 1,
-	.htotal = 480 + 5 + 1 + 40,
-	.vdisplay = 272,
-	.vsync_start = 272 + 8,
-	.vsync_end = 272 + 8 + 1,
-	.vtotal = 272 + 8 + 1 + 8,
-	.vrefresh = 60,
+.clock = 9000,
+.hdisplay = 480,
+.hsync_start = 480 + 5,
+.hsync_end = 480 + 5 + 1,
+.htotal = 480 + 5 + 1 + 40,
+.vdisplay = 272,
+.vsync_start = 272 + 8,
+.vsync_end = 272 + 8 + 1,
+.vtotal = 272 + 8 + 1 + 8,
+.vrefresh = 60,
 };
 
 static const struct panel_desc giantplus_gpg482739qs5 = {
-	.modes = &giantplus_gpg482739qs5_mode,
-	.num_modes = 1,
-	.bpc = 8,
-	.size = {
-		.width = 95,
-		.height = 54,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+.modes = &giantplus_gpg482739qs5_mode,
+.num_modes = 1,
+.bpc = 8,
+.size = {
+	.width = 95,
+	.height = 54,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
 };
 
 static const struct display_timing hannstar_hsd070pww1_timing = {
-	.pixelclock = { 64300000, 71100000, 82000000 },
-	.hactive = { 1280, 1280, 1280 },
-	.hfront_porch = { 1, 1, 10 },
-	.hback_porch = { 1, 1, 10 },
-	/*
-	 * According to the data sheet, the minimum horizontal blanking interval
-	 * is 54 clocks (1 + 52 + 1), but tests with a Nitrogen6X have shown the
-	 * minimum working horizontal blanking interval to be 60 clocks.
-	 */
-	.hsync_len = { 58, 158, 661 },
-	.vactive = { 800, 800, 800 },
-	.vfront_porch = { 1, 1, 10 },
-	.vback_porch = { 1, 1, 10 },
-	.vsync_len = { 1, 21, 203 },
-	.flags = DISPLAY_FLAGS_DE_HIGH,
+.pixelclock = { 64300000, 71100000, 82000000 },
+.hactive = { 1280, 1280, 1280 },
+.hfront_porch = { 1, 1, 10 },
+.hback_porch = { 1, 1, 10 },
+/*
+ * According to the data sheet, the minimum horizontal blanking interval
+ * is 54 clocks (1 + 52 + 1), but tests with a Nitrogen6X have shown the
+ * minimum working horizontal blanking interval to be 60 clocks.
+ */
+.hsync_len = { 58, 158, 661 },
+.vactive = { 800, 800, 800 },
+.vfront_porch = { 1, 1, 10 },
+.vback_porch = { 1, 1, 10 },
+.vsync_len = { 1, 21, 203 },
+.flags = DISPLAY_FLAGS_DE_HIGH,
 };
 
 static const struct panel_desc hannstar_hsd070pww1 = {
-	.timings = &hannstar_hsd070pww1_timing,
-	.num_timings = 1,
-	.bpc = 6,
-	.size = {
-		.width = 151,
-		.height = 94,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG,
+.timings = &hannstar_hsd070pww1_timing,
+.num_timings = 1,
+.bpc = 6,
+.size = {
+	.width = 151,
+	.height = 94,
+},
+.bus_format = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG,
 };
 
 static const struct display_timing hannstar_hsd100pxn1_timing = {
-	.pixelclock = { 55000000, 65000000, 75000000 },
-	.hactive = { 1024, 1024, 1024 },
-	.hfront_porch = { 40, 40, 40 },
-	.hback_porch = { 220, 220, 220 },
-	.hsync_len = { 20, 60, 100 },
-	.vactive = { 768, 768, 768 },
-	.vfront_porch = { 7, 7, 7 },
-	.vback_porch = { 21, 21, 21 },
-	.vsync_len = { 10, 10, 10 },
-	.flags = DISPLAY_FLAGS_DE_HIGH,
+.pixelclock = { 55000000, 65000000, 75000000 },
+.hactive = { 1024, 1024, 1024 },
+.hfront_porch = { 40, 40, 40 },
+.hback_porch = { 220, 220, 220 },
+.hsync_len = { 20, 60, 100 },
+.vactive = { 768, 768, 768 },
+.vfront_porch = { 7, 7, 7 },
+.vback_porch = { 21, 21, 21 },
+.vsync_len = { 10, 10, 10 },
+.flags = DISPLAY_FLAGS_DE_HIGH,
 };
 
 static const struct panel_desc hannstar_hsd100pxn1 = {
-	.timings = &hannstar_hsd100pxn1_timing,
-	.num_timings = 1,
-	.bpc = 6,
-	.size = {
-		.width = 203,
-		.height = 152,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG,
+.timings = &hannstar_hsd100pxn1_timing,
+.num_timings = 1,
+.bpc = 6,
+.size = {
+	.width = 203,
+	.height = 152,
+},
+.bus_format = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG,
 };
 
 static const struct drm_display_mode hitachi_tx23d38vm0caa_mode = {
-	.clock = 33333,
-	.hdisplay = 800,
-	.hsync_start = 800 + 85,
-	.hsync_end = 800 + 85 + 86,
-	.htotal = 800 + 85 + 86 + 85,
-	.vdisplay = 480,
-	.vsync_start = 480 + 16,
-	.vsync_end = 480 + 16 + 13,
-	.vtotal = 480 + 16 + 13 + 16,
-	.vrefresh = 60,
+.clock = 33333,
+.hdisplay = 800,
+.hsync_start = 800 + 85,
+.hsync_end = 800 + 85 + 86,
+.htotal = 800 + 85 + 86 + 85,
+.vdisplay = 480,
+.vsync_start = 480 + 16,
+.vsync_end = 480 + 16 + 13,
+.vtotal = 480 + 16 + 13 + 16,
+.vrefresh = 60,
 };
 
 static const struct panel_desc hitachi_tx23d38vm0caa = {
-	.modes = &hitachi_tx23d38vm0caa_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 195,
-		.height = 117,
-	},
-	.delay = {
-		.enable = 160,
-		.disable = 160,
-	},
+.modes = &hitachi_tx23d38vm0caa_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 195,
+	.height = 117,
+},
+.delay = {
+	.enable = 160,
+	.disable = 160,
+},
 };
 
 static const struct drm_display_mode innolux_at043tn24_mode = {
-	.clock = 9000,
-	.hdisplay = 480,
-	.hsync_start = 480 + 2,
-	.hsync_end = 480 + 2 + 41,
-	.htotal = 480 + 2 + 41 + 2,
-	.vdisplay = 272,
-	.vsync_start = 272 + 2,
-	.vsync_end = 272 + 2 + 10,
-	.vtotal = 272 + 2 + 10 + 2,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
+.clock = 9000,
+.hdisplay = 480,
+.hsync_start = 480 + 2,
+.hsync_end = 480 + 2 + 41,
+.htotal = 480 + 2 + 41 + 2,
+.vdisplay = 272,
+.vsync_start = 272 + 2,
+.vsync_end = 272 + 2 + 10,
+.vtotal = 272 + 2 + 10 + 2,
+.vrefresh = 60,
+.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
 };
 
 static const struct panel_desc innolux_at043tn24 = {
-	.modes = &innolux_at043tn24_mode,
-	.num_modes = 1,
-	.bpc = 8,
-	.size = {
-		.width = 95,
-		.height = 54,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
-	.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_DRIVE_POSEDGE,
+.modes = &innolux_at043tn24_mode,
+.num_modes = 1,
+.bpc = 8,
+.size = {
+	.width = 95,
+	.height = 54,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+.bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_DRIVE_POSEDGE,
 };
 
 static const struct drm_display_mode innolux_at070tn92_mode = {
-	.clock = 33333,
-	.hdisplay = 800,
-	.hsync_start = 800 + 210,
-	.hsync_end = 800 + 210 + 20,
-	.htotal = 800 + 210 + 20 + 46,
-	.vdisplay = 480,
-	.vsync_start = 480 + 22,
-	.vsync_end = 480 + 22 + 10,
-	.vtotal = 480 + 22 + 23 + 10,
-	.vrefresh = 60,
+.clock = 33333,
+.hdisplay = 800,
+.hsync_start = 800 + 210,
+.hsync_end = 800 + 210 + 20,
+.htotal = 800 + 210 + 20 + 46,
+.vdisplay = 480,
+.vsync_start = 480 + 22,
+.vsync_end = 480 + 22 + 10,
+.vtotal = 480 + 22 + 23 + 10,
+.vrefresh = 60,
 };
 
 static const struct panel_desc innolux_at070tn92 = {
-	.modes = &innolux_at070tn92_mode,
-	.num_modes = 1,
-	.size = {
-		.width = 154,
-		.height = 86,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
+.modes = &innolux_at070tn92_mode,
+.num_modes = 1,
+.size = {
+	.width = 154,
+	.height = 86,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
 };
 
 static const struct display_timing innolux_g070y2_l01_timing = {
-	.pixelclock = { 28000000, 29500000, 32000000 },
-	.hactive = { 800, 800, 800 },
-	.hfront_porch = { 61, 91, 141 },
-	.hback_porch = { 60, 90, 140 },
-	.hsync_len = { 12, 12, 12 },
-	.vactive = { 480, 480, 480 },
-	.vfront_porch = { 4, 9, 30 },
-	.vback_porch = { 4, 8, 28 },
-	.vsync_len = { 2, 2, 2 },
-	.flags = DISPLAY_FLAGS_DE_HIGH,
+.pixelclock = { 28000000, 29500000, 32000000 },
+.hactive = { 800, 800, 800 },
+.hfront_porch = { 61, 91, 141 },
+.hback_porch = { 60, 90, 140 },
+.hsync_len = { 12, 12, 12 },
+.vactive = { 480, 480, 480 },
+.vfront_porch = { 4, 9, 30 },
+.vback_porch = { 4, 8, 28 },
+.vsync_len = { 2, 2, 2 },
+.flags = DISPLAY_FLAGS_DE_HIGH,
 };
 
 static const struct panel_desc innolux_g070y2_l01 = {
-	.timings = &innolux_g070y2_l01_timing,
-	.num_timings = 1,
-	.bpc = 6,
-	.size = {
-		.width = 152,
-		.height = 91,
-	},
-	.delay = {
-		.prepare = 10,
-		.enable = 100,
-		.disable = 100,
-		.unprepare = 800,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+.timings = &innolux_g070y2_l01_timing,
+.num_timings = 1,
+.bpc = 6,
+.size = {
+	.width = 152,
+	.height = 91,
+},
+.delay = {
+	.prepare = 10,
+	.enable = 100,
+	.disable = 100,
+	.unprepare = 800,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
 };
 
 static const struct display_timing innolux_g101ice_l01_timing = {
-	.pixelclock = { 60400000, 71100000, 74700000 },
-	.hactive = { 1280, 1280, 1280 },
-	.hfront_porch = { 41, 80, 100 },
-	.hback_porch = { 40, 79, 99 },
-	.hsync_len = { 1, 1, 1 },
-	.vactive = { 800, 800, 800 },
-	.vfront_porch = { 5, 11, 14 },
-	.vback_porch = { 4, 11, 14 },
-	.vsync_len = { 1, 1, 1 },
-	.flags = DISPLAY_FLAGS_DE_HIGH,
+.pixelclock = { 60400000, 71100000, 74700000 },
+.hactive = { 1280, 1280, 1280 },
+.hfront_porch = { 41, 80, 100 },
+.hback_porch = { 40, 79, 99 },
+.hsync_len = { 1, 1, 1 },
+.vactive = { 800, 800, 800 },
+.vfront_porch = { 5, 11, 14 },
+.vback_porch = { 4, 11, 14 },
+.vsync_len = { 1, 1, 1 },
+.flags = DISPLAY_FLAGS_DE_HIGH,
 };
 
 static const struct panel_desc innolux_g101ice_l01 = {
-	.timings = &innolux_g101ice_l01_timing,
-	.num_timings = 1,
-	.bpc = 8,
-	.size = {
-		.width = 217,
-		.height = 135,
-	},
-	.delay = {
-		.enable = 200,
-		.disable = 200,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+.timings = &innolux_g101ice_l01_timing,
+.num_timings = 1,
+.bpc = 8,
+.size = {
+	.width = 217,
+	.height = 135,
+},
+.delay = {
+	.enable = 200,
+	.disable = 200,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
 };
 
 static const struct display_timing innolux_g121i1_l01_timing = {
-	.pixelclock = { 67450000, 71000000, 74550000 },
-	.hactive = { 1280, 1280, 1280 },
-	.hfront_porch = { 40, 80, 160 },
-	.hback_porch = { 39, 79, 159 },
-	.hsync_len = { 1, 1, 1 },
-	.vactive = { 800, 800, 800 },
-	.vfront_porch = { 5, 11, 100 },
-	.vback_porch = { 4, 11, 99 },
-	.vsync_len = { 1, 1, 1 },
+.pixelclock = { 67450000, 71000000, 74550000 },
+.hactive = { 1280, 1280, 1280 },
+.hfront_porch = { 40, 80, 160 },
+.hback_porch = { 39, 79, 159 },
+.hsync_len = { 1, 1, 1 },
+.vactive = { 800, 800, 800 },
+.vfront_porch = { 5, 11, 100 },
+.vback_porch = { 4, 11, 99 },
+.vsync_len = { 1, 1, 1 },
 };
 
 static const struct panel_desc innolux_g121i1_l01 = {
-	.timings = &innolux_g121i1_l01_timing,
-	.num_timings = 1,
-	.bpc = 6,
-	.size = {
-		.width = 261,
-		.height = 163,
-	},
-	.delay = {
-		.enable = 200,
-		.disable = 20,
-	},
-	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+.timings = &innolux_g121i1_l01_timing,
+.num_timings = 1,
+.bpc = 6,
+.size = {
+	.width = 261,
+	.height = 163,
+},
+.delay = {
+	.enable = 200,
+	.disable = 20,
+},
+.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
 };
 
 static const struct drm_display_mode innolux_g121x1_l03_mode = {
-	.clock = 65000,
-	.hdisplay = 1024,
-	.hsync_start = 1024 + 0,
-	.hsync_end = 1024 + 1,
-	.htotal = 1024 + 0 + 1 + 320,
-	.vdisplay = 768,
-	.vsync_start = 768 + 38,
-	.vsync_end = 768 + 38 + 1,
-	.vtotal = 768 + 38 + 1 + 0,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
+.clock = 65000,
+.hdisplay = 1024,
+.hsync_start = 1024 + 0,
+.hsync_end = 1024 + 1,
+.htotal = 1024 + 0 + 1 + 320,
+.vdisplay = 768,
+.vsync_start = 768 + 38,
+.vsync_end = 768 + 38 + 1,
+.vtotal = 768 + 38 + 1 + 0,
+.vrefresh = 60,
+.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
 };
 
 static const struct panel_desc innolux_g121x1_l03 = {
-	.modes = &innolux_g121x1_l03_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 246,
-		.height = 185,
-	},
-	.delay = {
-		.enable = 200,
-		.unprepare = 200,
-		.disable = 400,
-	},
+.modes = &innolux_g121x1_l03_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 246,
+	.height = 185,
+},
+.delay = {
+	.enable = 200,
+	.unprepare = 200,
+	.disable = 400,
+},
 };
 
 static const struct drm_display_mode innolux_n116bge_mode = {
-	.clock = 76420,
-	.hdisplay = 1366,
-	.hsync_start = 1366 + 136,
-	.hsync_end = 1366 + 136 + 30,
-	.htotal = 1366 + 136 + 30 + 60,
-	.vdisplay = 768,
-	.vsync_start = 768 + 8,
-	.vsync_end = 768 + 8 + 12,
-	.vtotal = 768 + 8 + 12 + 12,
-	.vrefresh = 60,
-	.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
+.clock = 76420,
+.hdisplay = 1366,
+.hsync_start = 1366 + 136,
+.hsync_end = 1366 + 136 + 30,
+.htotal = 1366 + 136 + 30 + 60,
+.vdisplay = 768,
+.vsync_start = 768 + 8,
+.vsync_end = 768 + 8 + 12,
+.vtotal = 768 + 8 + 12 + 12,
+.vrefresh = 60,
+.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
 };
 
 static const struct panel_desc innolux_n116bge = {
-	.modes = &innolux_n116bge_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 256,
-		.height = 144,
-	},
+.modes = &innolux_n116bge_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 256,
+	.height = 144,
+},
 };
 
 static const struct drm_display_mode innolux_n156bge_l21_mode = {
-	.clock = 69300,
-	.hdisplay = 1366,
-	.hsync_start = 1366 + 16,
-	.hsync_end = 1366 + 16 + 34,
-	.htotal = 1366 + 16 + 34 + 50,
-	.vdisplay = 768,
-	.vsync_start = 768 + 2,
-	.vsync_end = 768 + 2 + 6,
-	.vtotal = 768 + 2 + 6 + 12,
-	.vrefresh = 60,
+.clock = 69300,
+.hdisplay = 1366,
+.hsync_start = 1366 + 16,
+.hsync_end = 1366 + 16 + 34,
+.htotal = 1366 + 16 + 34 + 50,
+.vdisplay = 768,
+.vsync_start = 768 + 2,
+.vsync_end = 768 + 2 + 6,
+.vtotal = 768 + 2 + 6 + 12,
+.vrefresh = 60,
 };
 
 static const struct panel_desc innolux_n156bge_l21 = {
-	.modes = &innolux_n156bge_l21_mode,
-	.num_modes = 1,
-	.bpc = 6,
-	.size = {
-		.width = 344,
-		.height = 193,
-	},
+.modes = &innolux_n156bge_l21_mode,
+.num_modes = 1,
+.bpc = 6,
+.size = {
+	.width = 344,
+	.height = 193,
+},
 };
 
 static const struct drm_display_mode innolux_p120zdg_bf1_mode = {
@@ -1524,6 +1524,28 @@ static const struct panel_desc innolux_p120zdg_bf1 = {
 		.hpd_absent_delay = 200,
 		.unprepare = 500,
 	},
+
+static const struct drm_display_mode innolux_n173hce_e31_mode = {
+        .clock = 148800,
+        .hdisplay = 1920,
+        .hsync_start = 1920 + 88,
+        .hsync_end = 1920 + 88 + 44,
+        .htotal = 1920 + 88 + 44 + 148,
+        .vdisplay = 1080,
+        .vsync_start = 1080 + 4,
+        .vsync_end = 1080 + 4 + 5,
+        .vtotal = 1080 + 4 + 5 + 36,
+        .vrefresh = 60,
+};
+
+static const struct panel_desc innolux_n173hce_e31 = {
+        .modes = &innolux_n173hce_e31_mode,
+        .num_modes = 1,
+        .bpc = 6,
+        .size = {
+                .width = 382,
+                .height = 215,
+        },
 };
 
 static const struct drm_display_mode innolux_zj070na_01p_mode = {
@@ -2703,6 +2725,9 @@ static const struct of_device_id platform_of_match[] = {
 		.compatible = "innolux,p120zdg-bf1",
 		.data = &innolux_p120zdg_bf1,
 	}, {
+                .compatible = "innolux,n173hce-e31",
+                .data = &innolux_n173hce_e31,
+        }, {
 		.compatible = "innolux,zj070na-01p",
 		.data = &innolux_zj070na_01p,
 	}, {
