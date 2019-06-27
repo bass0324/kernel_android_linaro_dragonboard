@@ -79,49 +79,46 @@
 			label = "HS-I2C2";
 			status = "okay";
 
-			adv_bridge: bridge@39 {
+			edp_bridge: edp-bridge@2d {
 				status = "okay";
 
-
-				compatible = "adi,adv7533";
-				reg = <0x39>;
-
-				interrupt-parent = <&msmgpio>;
-				interrupts = <31 2>;
-
-				adi,dsi-lanes = <4>;
-				clocks = <&rpmcc RPM_SMD_BB_CLK2>;
-				clock-names = "cec";
+				compatible = "ti,sn65dsi86";
+				#adress-cells = <1>;
+				#size-cells = <0>;
+				reg = <0x2d>;
 
 				pd-gpios = <&msmgpio 32 1>;
 
-				avdd-supply = <&pm8916_l6>;
-				v1p2-supply = <&pm8916_l6>;
-				v3p3-supply = <&pm8916_l17>;
+				enable-gpios = <&msmgpio 32 GPIO_ACTIVE_HIGH>; 
 
-				pinctrl-names = "default","sleep";
-				pinctrl-0 = <&adv7533_int_suspend &adv7533_switch_suspend>;
-				pinctrl-1 = <&adv7533_int_suspend &adv7533_switch_suspend>;
-				#sound-dai-cells = <1>;
+				vccio-supply = <&pm8916_l17>;
+				vcca-supply = <&pm8916_l6>;
+				vpll-supply = <&pm8916_l17>;
+				vcc-supply = <&pm8916_l6>;
+			
+				clock-names = "refclk";
+				clocks = <&input_refclk>;
 
 				ports {
 					#address-cells = <1>;
-					#size-cells = <0>;
+                                        #size-cells = <0>;
 
-					port@0 {
-						reg = <0>;
-						adv7533_in: endpoint {
-							remote-endpoint = <&dsi0_out>;
-						};
-					};
+                                        port@0 {
+                                                reg = <0>;
+                                                edp_bridge_in: endpoint {
+                                                        remote-endpoint = <&dsi0_out>;
+                                                };
+                                        };
 
-					port@1 {
-						reg = <1>;
-						adv7533_out: endpoint {
-							remote-endpoint = <&hdmi_con>;
-						};
-					};
-				};
+                                        port@1 {
+                                                reg = <1>;
+                                                edp_bridge_out: endpoint {
+							data-lanes = <0 1>;
+							lane-polarities = <0 0>;
+                                                        remote-endpoint = <&edp_panel_in>;
+                                                };
+                                        };
+                                };
 			};
 		};
 
@@ -258,7 +255,7 @@
 				ports {
 					port@1 {
 						endpoint {
-							remote-endpoint = <&adv7533_in>;
+							remote-endpoint = <&edp_bridge_in>;
 							data-lanes = <0 1 2 3>;
 						};
 					};
@@ -304,15 +301,6 @@
                         qcom,audio-routing =
                                 "AMIC2", "MIC BIAS Internal2",
                                 "AMIC3", "MIC BIAS External1";
-			external-dai-link@0 {
-				link-name = "ADV7533";
-				cpu { /* QUAT */
-					sound-dai = <&lpass MI2S_QUATERNARY>;
-				};
-				codec {
-					sound-dai = <&adv_bridge 0>;
-				};
-			};
 
                         internal-codec-playback-dai-link@0 {            /* I2S - Internal codec */
                                 link-name = "WCD";
@@ -480,13 +468,13 @@
 		#mux-control-cells = <0>;
 	};
 
-	hdmi-out {
-		compatible = "hdmi-connector";
-		type = "a";
-
+	panel: innolux,n173hce-e31 {
+		status = "okay";
+		compatible = "innolux,n173hce-e31";
+		
 		port {
-			hdmi_con: endpoint {
-				remote-endpoint = <&adv7533_out>;
+			edp_panel_in: endpoint {
+				remote-endpoint = <&edp_bridge_out>;
 			};
 		};
 	};
@@ -505,6 +493,13 @@
 			linux,code = <KEY_VOLUMEUP>;
 			gpios = <&msmgpio 107 GPIO_ACTIVE_LOW>;
 		};
+	};
+	clocks {
+                input_refclk: input_refclk {
+                        compatible = "fixed-clock";
+                        #clock-cells = <0>;
+                        clock-frequency = <27000000>;
+                };
 	};
 };
 
