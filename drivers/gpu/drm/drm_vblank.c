@@ -1660,12 +1660,28 @@ int drm_wait_vblank_ioctl(struct drm_device *dev, void *data,
 	}
 
 	if (req_seq != seq) {
+		int wait;
+
 		DRM_DEBUG("waiting on vblank count %llu, crtc %u\n",
 			  req_seq, pipe);
-		DRM_WAIT_ON(ret, vblank->queue, 3 * HZ,
-			    vblank_passed(drm_vblank_count(dev, pipe),
-					  req_seq) ||
-			    !READ_ONCE(vblank->enabled));
+		wait = wait_event_interruptible_timeout(vblank->queue,
+			vblank_passed(drm_vblank_count(dev, pipe), req_seq) ||
+				      !READ_ONCE(vblank->enabled),
+			msecs_to_jiffies(3000));
+
+		switch (wait) {
+		case 0:
+			/* timeout */
+			ret = -EBUSY;
+			break;
+		case -ERESTARTSYS:
+			/* interrupted by signal */
+			ret = -EINTR;
+			break;
+		default:
+			ret = 0;
+			break;
+		}
 	}
 
 	if (ret != -EINTR) {
