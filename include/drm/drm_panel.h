@@ -126,7 +126,7 @@ int drm_panel_add(struct drm_panel *panel);
 void drm_panel_remove(struct drm_panel *panel);
 
 int drm_panel_attach(struct drm_panel *panel, struct drm_connector *connector);
-int drm_panel_detach(struct drm_panel *panel);
+void drm_panel_detach(struct drm_panel *panel);
 
 int drm_panel_notifier_register(struct drm_panel *panel,
 	struct notifier_block *nb);
