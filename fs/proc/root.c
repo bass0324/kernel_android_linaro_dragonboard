@@ -82,8 +82,7 @@ static int proc_parse_param(struct fs_context *fc, struct fs_parameter *param)
 	return 0;
 }
 
-static void proc_apply_options(struct super_block *s,
-			       struct fs_context *fc,
+static void proc_apply_options(struct fs_context *fc,
 			       struct pid_namespace *pid_ns,
 			       struct user_namespace *user_ns)
 {
@@ -101,7 +100,7 @@ static int proc_fill_super(struct super_block *s, struct fs_context *fc)
 	struct inode *root_inode;
 	int ret;
 
-	proc_apply_options(s, fc, pid_ns, current_user_ns());
+	proc_apply_options(fc, pid_ns, current_user_ns());
 
 	/* User space would break if executables or devices appear on proc */
 	s->s_iflags |= SB_I_USERNS_VISIBLE | SB_I_NOEXEC | SB_I_NODEV;
@@ -149,7 +148,7 @@ static int proc_reconfigure(struct fs_context *fc)
 
 	sync_filesystem(sb);
 
-	proc_apply_options(sb, fc, pid, current_user_ns());
+	proc_apply_options(fc, pid, current_user_ns());
 	return 0;
 }
 
@@ -160,6 +159,7 @@ static int proc_get_tree(struct fs_context *fc)
 	put_user_ns(fc->user_ns);
 	fc->user_ns = get_user_ns(ctx->pid_ns->user_ns);
 	fc->s_fs_info = ctx->pid_ns;
+        proc_apply_options(fc, ctx->pid_ns, current_user_ns());
 	return vfs_get_super(fc, vfs_get_keyed_super, proc_fill_super);
 }
 
