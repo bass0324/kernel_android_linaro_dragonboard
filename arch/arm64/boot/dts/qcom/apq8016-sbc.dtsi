@@ -483,6 +483,7 @@
 
 		wcnss@a21b000 {
 			status = "okay";
+			firmware-name = "qcom/msm8916/wcnss.mdt";
 		};
 	};
 
@@ -532,6 +533,11 @@
                         clock-frequency = <27000000>;
                 };
 	};
+};
+
+&mpss {
+	status = "okay";
+	firmware-name = "qcom/msm8916/mba.mbn", "qcom/msm8916/modem.mdt";
 };
 
 &spmi_bus {
