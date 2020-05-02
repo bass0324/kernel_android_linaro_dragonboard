@@ -1524,6 +1524,7 @@ static const struct panel_desc innolux_p120zdg_bf1 = {
 		.hpd_absent_delay = 200,
 		.unprepare = 500,
 	},
+};
 
 static const struct drm_display_mode innolux_n173hce_e31_mode = {
 	.clock = 148800,
