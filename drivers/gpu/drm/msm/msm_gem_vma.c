@@ -34,7 +34,7 @@ void msm_gem_purge_vma(struct msm_gem_address_space *aspace,
 	unsigned size = vma->node.size << PAGE_SHIFT;
 
 	/* Print a message if we try to purge a vma in use */
-	if (WARN_ON(vma->inuse > 0))
+	if (WARN_ON(!aspace || vma->inuse > 0))
 		return;
 
 	/* Don't do anything if the memory isn't mapped */
@@ -63,7 +63,7 @@ msm_gem_map_vma(struct msm_gem_address_space *aspace,
 	unsigned size = npages << PAGE_SHIFT;
 	int ret = 0;
 
-	if (WARN_ON(!vma->iova))
+	if (WARN_ON(!aspace || !vma->iova))
 		return -EINVAL;
 
 	/* Increase the usage counter */
@@ -88,7 +88,7 @@ msm_gem_map_vma(struct msm_gem_address_space *aspace,
 void msm_gem_close_vma(struct msm_gem_address_space *aspace,
 		struct msm_gem_vma *vma)
 {
-	if (WARN_ON(vma->inuse > 0 || vma->mapped))
+	if (WARN_ON(!aspace || vma->inuse > 0 || vma->mapped))
 		return;
 
 	spin_lock(&aspace->lock);
@@ -107,7 +107,7 @@ int msm_gem_init_vma(struct msm_gem_address_space *aspace,
 {
 	int ret;
 
-	if (WARN_ON(vma->iova))
+	if (WARN_ON(!aspace || vma->iova))
 		return -EBUSY;
 
 	spin_lock(&aspace->lock);

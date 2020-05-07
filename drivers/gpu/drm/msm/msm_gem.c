@@ -293,7 +293,7 @@ static struct msm_gem_vma *add_vma(struct drm_gem_object *obj,
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
 	struct msm_gem_vma *vma;
 
-	WARN_ON(!mutex_is_locked(&msm_obj->lock));
+	WARN_ON(!aspace || !mutex_is_locked(&msm_obj->lock));
 
 	vma = kzalloc(sizeof(*vma), GFP_KERNEL);
 	if (!vma)
@@ -312,7 +312,7 @@ static struct msm_gem_vma *lookup_vma(struct drm_gem_object *obj,
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
 	struct msm_gem_vma *vma;
 
-	WARN_ON(!mutex_is_locked(&msm_obj->lock));
+	WARN_ON(!aspace || !mutex_is_locked(&msm_obj->lock));
 
 	list_for_each_entry(vma, &msm_obj->vmas, list) {
 		if (vma->aspace == aspace)
@@ -354,7 +354,7 @@ static int msm_gem_get_iova_locked(struct drm_gem_object *obj,
 	struct msm_gem_vma *vma;
 	int ret = 0;
 
-	WARN_ON(!mutex_is_locked(&msm_obj->lock));
+	WARN_ON(!aspace || !mutex_is_locked(&msm_obj->lock));
 
 	vma = lookup_vma(obj, aspace);
 
@@ -410,6 +410,8 @@ int msm_gem_get_and_pin_iova(struct drm_gem_object *obj,
 	u64 local;
 	int ret;
 
+	WARN_ON(!aspace);
+
 	mutex_lock(&msm_obj->lock);
 
 	ret = msm_gem_get_iova_locked(obj, aspace, &local);
@@ -434,6 +436,8 @@ int msm_gem_get_iova(struct drm_gem_object *obj,
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
 	int ret;
 
+	WARN_ON(!aspace);
+
 	mutex_lock(&msm_obj->lock);
 	ret = msm_gem_get_iova_locked(obj, aspace, iova);
 	mutex_unlock(&msm_obj->lock);
@@ -449,6 +453,8 @@ uint64_t msm_gem_iova(struct drm_gem_object *obj,
 {
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
 	struct msm_gem_vma *vma;
+
+	WARN_ON(!aspace);
 
 	mutex_lock(&msm_obj->lock);
 	vma = lookup_vma(obj, aspace);
@@ -468,6 +474,8 @@ void msm_gem_unpin_iova(struct drm_gem_object *obj,
 {
 	struct msm_gem_object *msm_obj = to_msm_bo(obj);
 	struct msm_gem_vma *vma;
+
+	WARN_ON(!aspace);
 
 	mutex_lock(&msm_obj->lock);
 	vma = lookup_vma(obj, aspace);
@@ -1123,6 +1131,8 @@ static void *_msm_gem_kernel_new(struct drm_device *dev, uint32_t size,
 	void *vaddr;
 	struct drm_gem_object *obj = _msm_gem_new(dev, size, flags, locked);
 	int ret;
+
+	WARN_ON(!aspace);
 
 	if (IS_ERR(obj))
 		return ERR_CAST(obj);
