@@ -4,6 +4,7 @@
  * datasheet: http://www.ti.com/lit/ds/symlink/sn65dsi86.pdf
  */
 
+#include <linux/backlight.h>
 #include <linux/clk.h>
 #include <linux/debugfs.h>
 #include <linux/gpio/consumer.h>
@@ -23,6 +24,8 @@
 #include <drm/drm_panel.h>
 #include <drm/drm_print.h>
 #include <drm/drm_probe_helper.h>
+
+#define TI_SN_BRIDGE_MAX_BRIGHTNESS 0xffff
 
 #define SN_DEVICE_REV_REG			0x08
 #define SN_DPPLL_SRC_REG			0x0A
@@ -52,6 +55,11 @@
 #define SN_DATA_FORMAT_REG			0x5B
 #define SN_HPD_DISABLE_REG			0x5C
 #define  HPD_DISABLE				BIT(0)
+#define SN_GPIO_CTRL_REG			0x5F
+#define  GPIO4_CTRL_MASK			GENMASK(7,6)
+#define  GPIO3_CTRL_MASK			GENMASK(5,4)
+#define  GPIO2_CTRL_MASK			GENMASK(3,2)
+#define  GPIO1_CTRL_MASK			GENMASK(1,0)
 #define SN_AUX_WDATA_REG(x)			(0x64 + (x))
 #define SN_AUX_ADDR_19_16_REG			0x74
 #define SN_AUX_ADDR_15_8_REG			0x75
@@ -70,10 +78,32 @@
 #define SN_ML_TX_MODE_REG			0x96
 #define  ML_TX_MAIN_LINK_OFF			0
 #define  ML_TX_NORMAL_MODE			BIT(0)
+#define SN_BACKLIGHT_LOW_REG			0xA3
+#define SN_BACKLIGHT_HIGH_REG			0xA4
+#define SN_PWM_CONTROL_REG			0xA5
+#define  SN_PWM_EN				BIT(1)
+#define  SN_PWM_INV				BIT(0)
 #define SN_AUX_CMD_STATUS_REG			0xF4
 #define  AUX_IRQ_STATUS_AUX_RPLY_TOUT		BIT(3)
 #define  AUX_IRQ_STATUS_AUX_SHORT		BIT(5)
 #define  AUX_IRQ_STATUS_NAT_I2C_FAIL		BIT(6)
+
+#define GPIO4_CTRL_INPUT	0x00
+#define GPIO4_CTRL_OUTPUT	0x40
+#define GPIO4_CTRL_PWM		0x80
+#define GPIO4_CTRL_RESERVED	0xC0
+#define GPIO3_CTRL_INPUT        0x00
+#define GPIO3_CTRL_OUTPUT       0x10
+#define GPIO3_CTRL_DSIA_HSYNC   0x20
+#define GPIO3_CTRL_RESERVED     0x30
+#define GPIO2_CTRL_INPUT        0x00
+#define GPIO2_CTRL_OUTPUT       0x04
+#define GPIO2_CTRL_DSIA_VSYNC   0x08
+#define GPIO2_CTRL_RESERVED     0x0C
+#define GPIO1_CTRL_INPUT        0x00
+#define GPIO1_CTRL_OUTPUT       0x01
+#define GPIO1_CTRL_SUSP_INPUT   0x02
+#define GPIO1_CTRL_RESERVED     0x03
 
 #define MIN_DSI_CLK_FREQ_MHZ	40
 
@@ -99,6 +129,8 @@ struct ti_sn_bridge {
 	struct drm_panel		*panel;
 	struct gpio_desc		*enable_gpio;
 	struct regulator_bulk_data	supplies[SN_REGULATOR_SUPPLY_NUM];
+	struct backlight_device		*bl;
+	bool enabled;
 };
 
 static const struct regmap_range ti_sn_bridge_volatile_ranges[] = {
@@ -342,6 +374,45 @@ err_dsi_host:
 	return ret;
 }
 
+static void ti_sn_bridge_backlight_enable(struct ti_sn_bridge *pdata)
+{
+        //regmap_write(pdata->regmap, SN_GPIO_CTRL_REG, 0x80);
+        /* Set GPIO4 to PWM output */
+        regmap_update_bits(pdata->regmap, SN_GPIO_CTRL_REG, GPIO4_CTRL_MASK,
+                           GPIO4_CTRL_PWM);
+        /* Set PWM Enable bit */
+        regmap_update_bits(pdata->regmap, SN_PWM_CONTROL_REG, SN_PWM_EN, SN_PWM_EN);
+        //regmap_write(pdata->regmap, SN_PWM_CONTROL_REG, 0x02);
+}
+
+static void ti_sn_bridge_backlight_disable(struct ti_sn_bridge *pdata)
+{
+        /* Set GPIO4 to default input */
+        regmap_update_bits(pdata->regmap, SN_GPIO_CTRL_REG, GPIO4_CTRL_MASK,
+                           GPIO4_CTRL_INPUT);
+        /* Unset PWM Enable bit */
+        regmap_update_bits(pdata->regmap, SN_PWM_CONTROL_REG, SN_PWM_EN, 0);
+        //regmap_write(pdata->regmap, SN_PWM_CONTROL_REG, 0x00);
+}
+
+static int ti_sn_bridge_backlight_update(struct backlight_device *bl)
+{
+        struct ti_sn_bridge *pdata = dev_get_drvdata(&bl->dev);
+        int brightness = bl->props.brightness;
+
+        if (!pdata->enabled)
+                return -EINVAL;
+
+        ti_sn_bridge_write_u16(pdata, SN_BACKLIGHT_LOW_REG, brightness);
+
+        return 0;
+}
+
+static const struct backlight_ops ti_sn_bridge_backlight_ops = {
+        .update_status = ti_sn_bridge_backlight_update,
+};
+
+
 static void ti_sn_bridge_disable(struct drm_bridge *bridge)
 {
 	struct ti_sn_bridge *pdata = bridge_to_ti_sn_bridge(bridge);
@@ -354,6 +425,10 @@ static void ti_sn_bridge_disable(struct drm_bridge *bridge)
 	regmap_write(pdata->regmap, SN_ML_TX_MODE_REG, 0);
 	/* disable DP PLL */
 	regmap_write(pdata->regmap, SN_PLL_ENABLE_REG, 0);
+	if (of_find_property(pdata->dev->of_node, "use-bridge-pwm", NULL)) {
+		/* disable PWM control */
+		ti_sn_bridge_backlight_disable(pdata);
+	}
 
 	drm_panel_unprepare(pdata->panel);
 }
@@ -583,11 +658,15 @@ static void ti_sn_bridge_pre_enable(struct drm_bridge *bridge)
 			   HPD_DISABLE);
 
 	drm_panel_prepare(pdata->panel);
+
+	pdata->enabled = true;
 }
 
 static void ti_sn_bridge_post_disable(struct drm_bridge *bridge)
 {
 	struct ti_sn_bridge *pdata = bridge_to_ti_sn_bridge(bridge);
+
+	pdata->enabled = false;
 
 	if (pdata->refclk)
 		clk_disable_unprepare(pdata->refclk);
@@ -762,6 +841,14 @@ static int ti_sn_bridge_probe(struct i2c_client *client,
 	pdata->aux.dev = pdata->dev;
 	pdata->aux.transfer = ti_sn_aux_transfer;
 	drm_dp_aux_register(&pdata->aux);
+	
+	if (of_find_property(pdata->dev->of_node, "use-bridge-pwm", NULL)) {
+		ti_sn_bridge_backlight_enable(pdata);
+		pdata->bl = backlight_device_register("ti_sn_bridge_backlight",
+				pdata->dev, pdata, &ti_sn_bridge_backlight_ops, NULL);
+		pdata->bl->props.max_brightness = TI_SN_BRIDGE_MAX_BRIGHTNESS;
+		pdata->bl->props.brightness = TI_SN_BRIDGE_MAX_BRIGHTNESS;
+	}
 
 	pdata->bridge.funcs = &ti_sn_bridge_funcs;
 	pdata->bridge.of_node = client->dev.of_node;
