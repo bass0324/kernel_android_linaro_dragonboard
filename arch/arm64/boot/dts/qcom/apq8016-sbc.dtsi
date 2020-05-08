@@ -240,6 +240,8 @@
 				clock-names = "refclk";
 				clocks = <&input_refclk>;
 
+				use-bridge-pwm;
+
 				ports {
 					#address-cells = <1>;
                                         #size-cells = <0>;
