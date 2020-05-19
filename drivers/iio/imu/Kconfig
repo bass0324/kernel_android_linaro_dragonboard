@@ -55,3 +55,5 @@ config IIO_ADIS_LIB_BUFFER
 	help
 	  A set of buffer helper functions for the Analog Devices ADIS* device
 	  family.
+
+source "drivers/iio/imu/st_lsm6dso/Kconfig"
